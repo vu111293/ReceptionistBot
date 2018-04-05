@@ -15,6 +15,27 @@ let express = require('express');
 let bodyParse = require('body-parser');
 let admin = require("firebase-admin", conf.SERVER_KEY_PATH);
 let serviceAccount = require(conf.SERVER_KEY_PATH);
+let temp = 0;
+
+var mqtt = require('mqtt');
+var client = mqtt.connect('mqtt://m14.cloudmqtt.com', {
+    port: 11235,
+    username: 'cosllpth',
+    password: 'mDz0FLgPrYJB'
+});
+
+client.on('connect', function () {
+    client.subscribe('/gom/sensor/temperature')
+    //    client.publish('presence', 'Hello mqtt')
+})
+
+client.on('message', function (topic, message) {
+    // message is Buffer
+    console.log(topic + " ->" + message.toString())
+    temp = message;
+    // client.end()
+})
+
 
 process.env.DEBUG = 'dialogflow:debug'; // enables lib debugging statements
 
@@ -543,6 +564,11 @@ app.post('/', function (request, response) {
         }
     }
 
+    // Handler IOT
+    function askTemperature(agent) {
+        agent.add('Nhiệt độ hiện tại là *' + temp + '*°C');
+    }
+
     // Handler help
     function helpRequest(agent) {
         agent.add('Marika xin kính chào quí khách');
@@ -552,7 +578,6 @@ app.post('/', function (request, response) {
         agent.add('Gõ \"thanh toán\" để gửi yêu cầu đến Receptioniest Marika');
         agent.add('Gõ \"\"')
     }
-
 
     // Support methods
     function createBill(agent, username) {
@@ -874,6 +899,9 @@ app.post('/', function (request, response) {
     intentMap.set('ask-anythings', askAnythings);
     intentMap.set('ask-anythings-detail', askThingsDetail);
     intentMap.set('ask-anythings-purchase', askThingsPurchase);
+
+    // ask IOT
+    intentMap.set('ask-temperature', askTemperature);
 
     // help handler
     intentMap.set('help-request', helpRequest);
