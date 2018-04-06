@@ -33,7 +33,7 @@ client.on('message', function (topic, message) {
     // message is Buffer
     console.log(topic + " ->" + message.toString())
     temp = message;
-    // client.end()
+    client.end();
 })
 
 
@@ -127,13 +127,9 @@ app.post('/', function (request, response) {
     }
 
     function fallback(agent) {
-        agent.add('Yêu cầu không thể xử lí');
-        agent.add('Xin thử lại với yêu cầu khác');
-
-
-
-
-
+        agent.add('Xãy ra lỗi, vui lòng thử lại');
+        agent.add('Marika Cafe bot đang chạy thử nghiệm');
+        agent.add('Mong bạn góp ý cách gõ \"feedback\" để Bot hoàn thiện hơn');
     }
 
     function other(agent) {
@@ -201,10 +197,13 @@ app.post('/', function (request, response) {
                     }
                 });
             } else {
-                agent.add('Hiện tại không bán ' + product);
+                agent.add('Hiện tại không bán *' + product + '*. Vui lòng chọn sản phẩm khác');
+                mDs.buildRichCategories(agent);
+
             }
         } else {
-            agent.add('Hiện tại không bán ' + product);
+            agent.add('Hiện tại không bán *' + product + '*. Vui lòng chọn sản phẩm khác');
+            mDs.buildRichCategories(agent);
         }
     }
 
@@ -264,20 +263,64 @@ app.post('/', function (request, response) {
     function editCartRequest(agent) {
         let product = agent.parameters['product'];
         if (product !== "") {
-            if (removeFromCart(agent, product)) {
-                agent.add('Đã xóa *' + product + '* khỏi danh sách.');
-                viewCartOnly(agent);
-            } else {
-                agent.add('Không tìm thấy *' + product + '* trong giỏ hàng.');
-            }
+            agent.add('Bạn muốn xóa sản phẩm *' + product + '* trong giỏ hàng?');
+
+            // if (removeFromCart(agent, product)) {
+            //     agent.add('Đã xóa *' + product + '* khỏi danh sách.');
+            //     viewCartOnly(agent);
+            // } else {
+            //     agent.add('Không tìm thấy *' + product + '* trong giỏ hàng.');
+            // }
         } else {
             if (viewCartOnly(agent)) {
-                agent.add('Bạn muốn điều chỉnh như thế nào?');
+                agent.add('Bạn muốn xóa sản phẩm nào?');
             } else {
                 // agent.add('Giỏ hàng rỗng. Mời bạn chọn sản phẩm');
                 // mDs.buildRichCategories(agent);
             }
         }
+    }
+
+    function removeItemCartRequest(agent) {
+        let product = agent.parameters['product'];
+        let quantity = agent.parameters['quantity'];
+        if (product) {
+            if (!quantity) {
+                quantity = -1;
+            }
+            if (removeFromCart(agent, product, quantity)) {
+                viewCartOnly(agent);
+            } else {
+                agent.add('Không tìm thấy *' + product + '* trong giỏ hàng.');
+            }
+        } else {
+            agent.add('Không tìm thấy sản phẩm *' + product + '* trong giỏ hàng');
+            viewCartOnly(agent);
+        }
+    }
+
+    function agreeRemoveItemCartRequest(agent) {
+        let context = agent.getContext('edit-cart-request-followup');
+        if (context && context.parameters.product) {
+            let product = context.parameters.product;
+            let quantity = context.parameters.quantity;
+            if (!quantity) {
+                quantity = -1;
+            }
+            if (removeFromCart(agent, product, quantity)) {
+                viewCartOnly(agent);
+            } else {
+                agent.add('Không tìm thấy *' + product + '* trong giỏ hàng.');
+            }
+        } else {
+            agent.add('Không tìm thấy sản phẩm bạn yêu cầu trong giỏ hàng');
+            viewCartOnly(agent);
+        }
+    }
+
+    function cancelRemoveItemCartRequest(agent) {
+        agent.add('Oke');
+        viewCart(agent);
     }
 
     function usernameRequest(agent) {
@@ -304,6 +347,11 @@ app.post('/', function (request, response) {
         let product = agent.parameters['product'];
         let quantity = agent.parameters['quantity'];
         addToCart(agent, mDs.findProduct(product), quantity, null);
+    }
+
+    function askNoneToppingCancel(agent) {
+        agent.add("Tiếp theo bạn có thể:");
+        buildNextAction(agent, ["THANH TOÁN", "XEM GIỎ HÀNG", "ĐIỀU CHỈNH ĐƠN HÀNG"]);
     }
 
     function multiOrderRequest(agent) {
@@ -364,6 +412,11 @@ app.post('/', function (request, response) {
         });
 
         if (SLACK_SUPPORT) {
+            let formal = agent.parameters['ask_formal'];
+            if (formal) {
+                agent.add('Bạn không cần dùng *\"' + formal + "\"* vậy đâu, ngại lắm =)");
+            }
+
             agent.add('Mời bạn tham khảo danh mục bên dưới');
             mDs.buildRichCategories(agent);
         } else {
@@ -400,6 +453,10 @@ app.post('/', function (request, response) {
         }
     }
 
+    function askDrinkMore(agent) {
+        mDs.buildMoreRichDrinks(agent);
+    }
+
     function askFood(agent) {
         agent.setContext({
             name: LIST_DISPLAY,
@@ -414,6 +471,10 @@ app.post('/', function (request, response) {
         } else {
             agent.add('Xem danh mục món ăn màn hình');
         }
+    }
+
+    function askFoodMore(agent) {
+        mDs.buildMoreRichFoods(agent);
     }
 
     function askGifs(agent) {
@@ -448,6 +509,18 @@ app.post('/', function (request, response) {
         } else {
             agent.add('Xem chương trình khuyến mãi trên màn hình');
         }
+    }
+
+    function askNoneCafe(agent) {
+        if (SLACK_SUPPORT) {
+            mDs.buildRichNoneCafe(agent);
+        } else {
+            agent.add('Xem danh mục quà tặng trên màn hình');
+        }
+    }
+
+    function askNoneCafeMore(agent) {
+        mDs.buildMoreRichNoneCafe(agent);
     }
 
     function askDetail(agent) {
@@ -509,7 +582,7 @@ app.post('/', function (request, response) {
         if (product) {
             let mProduct = mDs.findProduct(product);
             if (mProduct) {
-                agent.add('Bạn muốn mua hay xem chi tiết *' + product + '*?');
+                agent.add('Bạn muốn mua hay xem *' + product + '*?');
                 // handleSingleItemWithTopping(mProduct, 0, null);
             } else {
                 agent.add(product + ' chưa được kinh doanh tại quán. Xin vui lòng thử lại');
@@ -569,6 +642,12 @@ app.post('/', function (request, response) {
         agent.add('Nhiệt độ hiện tại là *' + temp + '*°C');
     }
 
+    function feedback(agent) {
+        let feedback = agent.parameters["feedback"];
+        saveFeedback(feedback);
+        agent.add("Chân thành cảm ơn góp ý của bạn. Chúc bạn 1 ngày vui vẻ tại Marika Cafe");
+    }
+
     // Handler help
     function helpRequest(agent) {
         agent.add('Marika xin kính chào quí khách');
@@ -576,7 +655,13 @@ app.post('/', function (request, response) {
         agent.add('Gõ \"cho {số lượng} {tên món}\" để thêm món');
         agent.add('Gõ \"giỏ hàng\" để xem giỏ hàng hiện tại');
         agent.add('Gõ \"thanh toán\" để gửi yêu cầu đến Receptioniest Marika');
+        agent.add('Gõ \"feedback\" để góp ý cho Receptioniest Marika');
         agent.add('Gõ \"\"')
+    }
+
+    function clearContext(agent) {
+        agent.clearOutgoingContexts();
+        welcome(agent);
     }
 
     // Support methods
@@ -632,6 +717,11 @@ app.post('/', function (request, response) {
         agent.add('Yêu cầu của bạn đã được gửi đến Marika Cafe');
         agent.add('Cảm ơn *' + username + '* đã sử dụng dịch vụ.')
         agent.add('Xin vui lòng đợi phục vụ');
+        agent.add('__*** *** ');
+        agent.add('_********* ');
+        agent.add('___***** ');
+        agent.add('_____* ');
+        agent.add('Mong bạn góp ý cách gõ *\"feedback\"* để Bot hoàn thiện hơn');
     }
 
     function addMultiToCart(agent, products) {
@@ -713,7 +803,7 @@ app.post('/', function (request, response) {
         return ret;
     }
 
-    function removeFromCart(agent, product) {
+    function removeFromCart(agent, product, quantity) {
         let mProduct = mDs.findProduct(product);
         let found = false;
         if (mProduct) {
@@ -724,6 +814,10 @@ app.post('/', function (request, response) {
                     let item = cartcontext.parameters.items[i];
                     if (mProduct.name.includes(item.name)) {
                         found = true;
+                        if (quantity > 0 && item.quantity - quantity > 0) {
+                            item.quantity -= quantity;
+                            newItems.push(item);
+                        }
                     } else {
                         newItems.push(item);
                     }
@@ -731,6 +825,14 @@ app.post('/', function (request, response) {
                 cartcontext.parameters.items = newItems;
             }
             agent.setContext(cartcontext);
+        }
+
+        if (found) {
+            if (quantity > 0) {
+                agent.add(util.format('Đã xóa %s *%s* khỏi danh sách.', quantity, product));
+            } else {
+                agent.add(util.format('Đã xóa *%s* khỏi danh sách.', product));
+            }
         }
         return found;
     }
@@ -854,6 +956,14 @@ app.post('/', function (request, response) {
         buildNextAction(agent, ["THANH TOÁN", "ĐIỀU CHỈNH", "HỦY ĐƠN HÀNG"]);
     }
 
+    function saveFeedback(feedback) {
+        let key = admin.database().ref('feedbacks').push().key;
+        admin.database().ref('feedbacks/' + key).set({
+            created: moment.now(),
+            fb: feedback
+        });
+    }
+
     // Run the proper handler based on the matched Dialogflow intent
     let intentMap = new Map();
     intentMap.set('Default Welcome Intent', welcome);
@@ -864,6 +974,7 @@ app.post('/', function (request, response) {
     intentMap.set('ask-product-any-topping', askProductAnyTopping);
     intentMap.set('ask-with-sugar', askWithSugar);
     intentMap.set('ask-nonetopping', askNoneTopping);
+    intentMap.set('ask-nonetopping-cancel', askNoneToppingCancel);
     intentMap.set('multi-order-request', multiOrderRequest);
 
     // handle payment
@@ -879,6 +990,9 @@ app.post('/', function (request, response) {
     intentMap.set('clear-cart - no', cancelClearCart);
 
     intentMap.set('edit-cart-request', editCartRequest);
+    intentMap.set('remove-item-cart-request', removeItemCartRequest);
+    intentMap.set('agree-remove-item-cart-request', agreeRemoveItemCartRequest);
+    intentMap.set('cancel-remove-item-cart-request', cancelRemoveItemCartRequest);
 
     intentMap.set('username-request', usernameRequest);
 
@@ -886,12 +1000,17 @@ app.post('/', function (request, response) {
     intentMap.set('ask-menu', askMenu);
     intentMap.set('ask-hot', askHot);
     intentMap.set('ask-drink', askDrink);
+    intentMap.set('ask-drink-more', askDrinkMore);
     intentMap.set('ask-food', askFood);
+    intentMap.set('ask-food-more', askFoodMore);
     intentMap.set('ask-gift', askGifs);
     intentMap.set('ask-promotion', askPromotion);
+    intentMap.set('ask-none-cafe', askNoneCafe);
+    intentMap.set('ask-none-cafe-more', askNoneCafeMore);
 
     intentMap.set('ask-detail', askDetail);
     intentMap.set('ask-detail-continue-purchase', askDetailContinuePurchase);
+
     // intentMap.set('ask-detail - yes', agreeDetailItem);
     // intentMap.set('ask-detail - no', cancelDetailItem);
 
@@ -903,8 +1022,12 @@ app.post('/', function (request, response) {
     // ask IOT
     intentMap.set('ask-temperature', askTemperature);
 
+    // feedback
+    intentMap.set('feedback', feedback);
+
     // help handler
     intentMap.set('help-request', helpRequest);
+    intentMap.set('clear-context', clearContext);
 
     if (agent.requestSource === agent.ACTIONS_ON_GOOGLE) {
         intentMap.set(null, googleAssistantOther);
