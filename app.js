@@ -1,5 +1,7 @@
 'use strict';
 
+// HEROKU HOST
+// https://coffeeshop-bot.herokuapp.com
 
 const functions = require('firebase-functions');
 const { WebhookClient } = require('dialogflow-fulfillment');
@@ -44,9 +46,15 @@ const imageUrl = 'https://developers.google.com/actions/images/badges/XPM_BADGIN
 const imageUrl2 = 'https://lh3.googleusercontent.com/Nu3a6F80WfixUqf_ec_vgXy_c0-0r4VLJRXjVFF_X_CIilEu8B9fT35qyTEj_PEsKw';
 const linkUrl = 'https://assistant.google.com/';
 
+const NONE_LANG = "no";
+const VIETNAMESE_LANG = "vi";
+const ENGLIST_LANG = "en";
+const JAPANESE_LANG = "jp";
+
 const LIST_DISPLAY = 'list-display-ui';
 const IMAGE_DISPLAY = 'image-display-ui';
 const CHART_DISPLAY = 'chart-display-ui';
+
 
 const TOPPING_MAP = [
     {
@@ -63,6 +71,7 @@ const TOPPING_MAP = [
     }
 ];
 
+let mCurrentLang = NONE_LANG;
 let mDs = new DataServer();
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
@@ -122,14 +131,36 @@ app.post('/', function (request, response) {
     }
 
     function welcome(agent) {
-        agent.add('Marika cafe xin kính chào quý khách!');
+        if (mCurrentLang == VIETNAMESE_LANG) {
+            agent.add('Marika cafe xin kính chào quý khách!');
+        } else if (mCurrentLang == JAPANESE_LANG) {
+            agent.add('GOOGLE');
+        } else {
+            agent.add('Welcome to Marika Cafe');
+        }
         mDs.buildHome(agent);
     }
 
     function fallback(agent) {
-        agent.add('Xãy ra lỗi, vui lòng thử lại');
-        agent.add('Marika Cafe bot đang chạy thử nghiệm');
-        agent.add('Mong bạn góp ý cách gõ \"feedback\" để Bot hoàn thiện hơn');
+        let items = mDs.findKeywork(agent.query);
+        if (items != null && items.length > 0) {
+            agent.add('Ý bạn là: ');
+            if (items.length < 3) {
+                for (let item in items) {
+                    agent.add(new Suggestion(items[item]));
+                }
+            } else {
+                let speech = '';
+                for (let item in items) {
+                    speech += "• " + items[item] + "\n";
+                }
+                agent.add(speech);
+            }
+        } else {
+            agent.add('Xãy ra lỗi, vui lòng thử lại');
+            agent.add('Marika Cafe bot đang chạy thử nghiệm');
+            agent.add('Mong bạn góp ý cách gõ \"feedback\" để Bot hoàn thiện hơn');
+        }
     }
 
     function other(agent) {
@@ -207,6 +238,37 @@ app.post('/', function (request, response) {
         }
     }
 
+    function askLanguages(agent) {
+        agent.add("Chọn ngôn ngữ của bạn (Select your language bellow)");
+        agent.add(new Suggestion("Việt Nam"));
+        agent.add(new Suggestion("English"));
+        agent.add(new Suggestion("Japanese"));
+    }
+
+    function askLanguagesResponse(agent) {
+        let lang = agent.parameters['lang'];
+        if (lang) {
+            let speech = "";
+            if (lang == 'Việt Nam') {
+                mCurrentLang = VIETNAMESE_LANG;
+                speech = "Bạn đã chọn ngôn ngữ Tiếng Việt.";
+            } else if (lang == 'English') {
+                mCurrentLang = ENGLIST_LANG;
+                speech = "English language was selected";
+            } else if (lang == 'Japanese') {
+                mCurrentLang = JAPANESE_LANG;
+                speech = "日本語が選ばれました。";
+            } else {
+                valid = false;
+                speech = "Ngôn ngữ bạn chọn không được hỗ trợ.";
+            }
+            mDs.setLang(mCurrentLang);
+            agent.add(speech);
+        } else {
+            agent.add("Ngôn ngữ bạn chọn chưa được hỗ trợ.");
+        }
+    }
+
     function askCart(agent) {
         viewCart(agent);
     }
@@ -244,6 +306,8 @@ app.post('/', function (request, response) {
         }
 
         agent.add('Bạn có muốn xóa giỏ hàng hiện tại?');
+        agent.add(new Suggestion("CÓ"));
+        agent.add(new Suggestion("KHÔNG"));
     }
 
     function agreeClearCart(agent) {
@@ -417,7 +481,7 @@ app.post('/', function (request, response) {
                 agent.add('Bạn không cần dùng *\"' + formal + "\"* vậy đâu, ngại lắm =)");
             }
 
-            agent.add('Mời bạn tham khảo danh mục bên dưới');
+            // agent.add('Mời bạn tham khảo danh mục bên dưới');
             mDs.buildRichCategories(agent);
         } else {
             agent.add('Xem danh mục trên màn hình');
@@ -533,6 +597,9 @@ app.post('/', function (request, response) {
         if (mProduct) {
             mDs.buildCardItem(agent, mProduct);
             agent.add('Bạn muốn mua mấy ly?');
+            for (let i = 1; i <= 5; ++i) {
+                agent.add(new Suggestion(i.toString()));
+            }
         } else {
             // product = product.toLowerCase();
             // if (product.includes('menu') || product.includes('thực đơn'))
@@ -583,6 +650,8 @@ app.post('/', function (request, response) {
             let mProduct = mDs.findProduct(product);
             if (mProduct) {
                 agent.add('Bạn muốn mua hay xem *' + product + '*?');
+                agent.add(new Suggestion("MUA"));
+                agent.add(new Suggestion("XEM"));
                 // handleSingleItemWithTopping(mProduct, 0, null);
             } else {
                 agent.add(product + ' chưa được kinh doanh tại quán. Xin vui lòng thử lại');
@@ -646,6 +715,7 @@ app.post('/', function (request, response) {
         let feedback = agent.parameters["feedback"];
         saveFeedback(feedback);
         agent.add("Chân thành cảm ơn góp ý của bạn. Chúc bạn 1 ngày vui vẻ tại Marika Cafe");
+        agent.add(new Suggestion('HOME'));
     }
 
     // Handler help
@@ -661,6 +731,7 @@ app.post('/', function (request, response) {
 
     function clearContext(agent) {
         agent.clearOutgoingContexts();
+        agent.setLanguagesContext(mCurrentLang);
         welcome(agent);
     }
 
@@ -758,7 +829,9 @@ app.post('/', function (request, response) {
             // agent.add(new Suggestion(speakout[i]));
         }
         agent.add('Bạn có muốn chọn món kế tiếp?');
-        buildNextAction(agent, ["THANH TOÁN", "ĐIỀU CHỈNH", "HỦY ĐƠN HÀNG"]);
+        agent.add(new Suggestion("CÓ"));
+        agent.add(new Suggestion("KHÔNG"));
+        // buildNextAction(agent, ["THANH TOÁN", "ĐIỀU CHỈNH", "HỦY ĐƠN HÀNG"]);
         // agent.add('Gõ \"xem giỏ hàng\" để xem sản phẩm đã chọn');
         // agent.add('Gõ \"thanh toán\" để gửi yêu cầu thanh toán');
     }
@@ -864,7 +937,9 @@ app.post('/', function (request, response) {
         agent.add(new Text(util.format('• x%s *%s* - %s', quantity, product.name, convTopping(options))));
         // agent.add(new Suggestion(util.format('x %s *%s* - %s', quantity, product.name, convTopping(options))));
         agent.add('Bạn có muốn tiếp tục mua hàng?');
-        buildNextAction(agent, ["THANH TOÁN", "ĐIỀU CHỈNH", "HỦY ĐƠN HÀNG"]);
+        agent.add(new Suggestion("CÓ"));
+        agent.add(new Suggestion("KHÔNG"));
+        // buildNextAction(agent, ["THANH TOÁN", "ĐIỀU CHỈNH", "HỦY ĐƠN HÀNG"]);
         // agent.add('Gõ \"xem giỏ hàng\" để xem sản phẩm đã chọn');
         // agent.add('Gõ \"thanh toán\" để gửi yêu cầu thanh toán');
     }
@@ -953,7 +1028,9 @@ app.post('/', function (request, response) {
 
         agent.add('Tổng tộng *' + mDs.formatPrice(total) + '* đồng');
         agent.add('Bạn có muốn tiếp tục mua hàng?');
-        buildNextAction(agent, ["THANH TOÁN", "ĐIỀU CHỈNH", "HỦY ĐƠN HÀNG"]);
+        agent.add(new Suggestion("CÓ"));
+        agent.add(new Suggestion("KHÔNG"));
+        // buildNextAction(agent, ["THANH TOÁN", "ĐIỀU CHỈNH", "HỦY ĐƠN HÀNG"]);
     }
 
     function saveFeedback(feedback) {
@@ -964,11 +1041,26 @@ app.post('/', function (request, response) {
         });
     }
 
+    function setLanguagesContext(lang) {
+        agent.setContext({
+            name: 'languages',
+            lifespan: 0,
+            parameters: {
+                "response_lang": lang
+            }
+        });
+    }
+
     // Run the proper handler based on the matched Dialogflow intent
     let intentMap = new Map();
     intentMap.set('Default Welcome Intent', welcome);
     intentMap.set('Default Fallback Intent', fallback);
     intentMap.set('ask-product-order', askProducForOrder);
+
+    // handle languages
+    intentMap.set('ask-languages', askLanguages);
+    intentMap.set('ask-languages-response', askLanguagesResponse);
+
 
     // handle ask order by topping
     intentMap.set('ask-product-any-topping', askProductAnyTopping);

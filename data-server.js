@@ -16,8 +16,13 @@ class DataServer {
         this.gifts = [];
         this.nonecafe = [];
         this.promotions = [];
+
+        this.lang = 'no';
     }
 
+    setLang(lnaguage) {
+        this.lang = lnaguage;
+    }
 
     getDrinkList() {
         return this.drinks;
@@ -67,6 +72,28 @@ class DataServer {
         console.log('done parse from firebase');
     }
 
+    findKeywork(query) {
+        var items = [];
+        if (!query) { return items; }
+
+        for (let key in this.allproducts) {
+            let item = this.allproducts[key];
+            if (item.replacename == null) {
+                continue;
+            }
+            query = query.toLowerCase();
+            let nameList = item.replacename.split(',');
+            for (let index in nameList) {
+                let name = nameList[index];
+                if (name.includes(query) == true) {
+                    items.push(item.name);
+                    break;
+                }
+            }
+        }
+        return items;
+    }
+
     findProduct(productname) {
         var foundItem;
         if (!productname) { return foundItem; }
@@ -92,7 +119,6 @@ class DataServer {
         }
 
         return foundItem;
-
     }
 
     buildCategories() {
@@ -110,7 +136,7 @@ class DataServer {
     }
 
     buildRichCategories(agent) {
-        agent.add('Danh mục sản phẩm');
+        // agent.add('Danh mục sản phẩm');
         for (let i in this.categories) {
             let item = this.categories[i];
             let suggestion = new Suggestion(item.name);
@@ -148,18 +174,19 @@ class DataServer {
 
     buildRichDrinks(agent) {
         if (this.drinks !== undefined) {
-            agent.add('Xem danh mục thức uống bên dưới');
+            let speech = 'Xem danh mục thức uống bên dưới:\n';
             let max = Math.min(MAX_ITEM_VIEW, this.drinks.length);
             for (let i = 0; i < max; ++i) {
-                agent.add(new Text(util.format("• *%s* - (%s)",
+                speech += (util.format("• *%s* - (%s)\n",
                     this.drinks[i].name,
-                    this.formatPrice(this.drinks[i].price))));
+                    this.formatPrice(this.drinks[i].price)))
             }
-            agent.add('Mời bạn chọn thức uống hoặc');
+            agent.add(speech);
+            agent.add('Gõ yêu cầu chọn món của bạn. Ví dụ: \"2 cafe sữa\"');
             if (this.drinks.length > MAX_ITEM_VIEW) {
-                this.buildNextAction(agent, ["XEM THÊM", "XEM CHI TIẾT", "XEM GIỎ HÀNG"]);
+                this.buildNextAction(agent, ["XEM THÊM", "XEM GIỎ HÀNG"]);
             } else {
-                this.buildNextAction(agent, ["XEM CHI TIẾT", "XEM GIỎ HÀNG"]);
+                this.buildNextAction(agent, ["XEM GIỎ HÀNG"]);
             }
         } else {
             agent.add('Hiện tại shop không bán thức uống.');
@@ -169,13 +196,15 @@ class DataServer {
 
     buildMoreRichDrinks(agent) {
         if (this.drinks !== undefined && this.drinks.length > MAX_ITEM_VIEW) {
+            let speech = '';
             for (let i = MAX_ITEM_VIEW; i < this.drinks.length; ++i) {
-                agent.add(new Text(util.format("• *%s* - (%s)",
+                speech += util.format("• *%s* - (%s)\n",
                     this.drinks[i].name,
-                    this.formatPrice(this.drinks[i].price))));
+                    this.formatPrice(this.drinks[i].price));
             }
+            agent.add(speech);
             agent.add('Mời bạn chọn thức uống hoặc ');
-            this.buildNextAction(agent, ["XEM CHI TIẾT", "XEM GIỎ HÀNG"]);
+            this.buildNextAction(agent, ["XEM GIỎ HÀNG"]);
         } else {
             agent.add('Hiện tại shop không bán thức uống.');
             this.buildRichCategories(agent);
@@ -185,17 +214,18 @@ class DataServer {
 
     buildRichFoods(agent) {
         if (this.foods !== undefined) {
-            agent.add('Xem danh mục thức ăn bên dưới');
+            let speech = 'Xem danh mục thức ăn bên dưới:\n';
             let max = Math.min(MAX_ITEM_VIEW, this.foods.length);
             for (let i = 0; i < max; ++i) {
-                agent.add(new Text(util.format("• *%s* - (%s)",
+                speech += util.format("• *%s* - (%s)",
                     this.foods[i].name,
-                    this.formatPrice(this.foods[i].price))));
+                    this.formatPrice(this.foods[i].price));
             }
+            agent.add(speech);
             if (this.foods.length > MAX_ITEM_VIEW) {
-                this.buildNextAction(agent, ["XEM THÊM", "XEM CHI TIẾT", "XEM GIỎ HÀNG"]);
+                this.buildNextAction(agent, ["XEM THÊM", "GIỎ HÀNG"]);
             } else {
-                this.buildNextAction(agent, ["XEM CHI TIẾT", "XEM GIỎ HÀNG"]);
+                this.buildNextAction(agent, ["GIỎ HÀNG"]);
             }
         } else {
             agent.add('Hiện tại shop không bán thức ăn.');
@@ -205,6 +235,7 @@ class DataServer {
 
     buildMoreRichFoods(agent) {
         if (this.foods !== undefined && this.foods.length > MAX_ITEM_VIEW) {
+
             for (let i = MAX_ITEM_VIEW; i < this.foods.length; ++i) {
                 agent.add(new Text(util.format("• *%s* - (%s)",
                     this.foods[i].name,
@@ -242,9 +273,9 @@ class DataServer {
                     this.formatPrice(this.nonecafe[i].price))));
             }
             if (this.nonecafe.length > MAX_ITEM_VIEW) {
-                this.buildNextAction(agent, ["XEM THÊM", "XEM CHI TIẾT", "XEM GIỎ HÀNG"]);
+                this.buildNextAction(agent, ["XEM THÊM", "GIỎ HÀNG"]);
             } else {
-                this.buildNextAction(agent, ["XEM CHI TIẾT", "XEM GIỎ HÀNG"]);
+                this.buildNextAction(agent, ["GIỎ HÀNG"]);
             }
         } else {
             agent.add('Hiện tại shop không sản phẩm ngoài thức uống.');
@@ -260,7 +291,7 @@ class DataServer {
                     this.formatPrice(this.nonecafe[i].price))));
             }
             agent.add('Mời bạn chọn món hoặc');
-            this.buildNextAction(agent, ["XEM CHI TIẾT", "XEM GIỎ HÀNG"]);
+            this.buildNextAction(agent, ["GIỎ HÀNG"]);
         } else {
             agent.add('Hiện tại shop không sản phẩm ngoài cafe.');
             this.buildRichCategories(agent);
@@ -317,12 +348,32 @@ class DataServer {
     }
 
     buildHome(agent) {
-        agent.add(new Text('• Gõ *\"xem menu\"* để xem danh mục menu'));
-        // agent.add(new Text('• Gõ *\"xem phòng\"* để xem danh sách phòng trống'));
-        agent.add(new Text('• Gõ *\"xem khuyến mãi\"* để xem chương trình khuyến mãi tại quán'));
-        agent.add(new Text('• Gõ *\"home, marika\"* để trở về danh mục chính'));
-        agent.add(new Text('• Gõ *\"trợ giúp, help\"* để xem hướng dẫn sử dụng'));
-        agent.add(new Text('• Gõ *\"feedback\"* để góp ý cho Receptioniest Marika'));
+        if (this.lang == 'vi') {
+            agent.add(new Suggestion("DS MÓN"));
+            agent.add(new Suggestion("KH MÃI"));
+            agent.add(new Suggestion("TRỢ GIÚP"));
+            agent.add(new Suggestion("FEEDBACK"));
+            agent.add(new Suggestion("TÌM KIẾM"));
+        } else if (this.lang == 'jp') {
+            agent.add(new Suggestion("メーユー"));
+            agent.add(new Suggestion("割引"));
+            agent.add(new Suggestion("助ける"));
+            agent.add(new Suggestion("饋還"));
+            agent.add(new Suggestion("調べる"));
+        } else {
+            agent.add(new Suggestion("MENU"));
+            agent.add(new Suggestion("PROMOTION"));
+            agent.add(new Suggestion("HELP"));
+            agent.add(new Suggestion("FEEDBACK"));
+            agent.add(new Suggestion("SEARCH"));
+        }
+
+        // let speech = '• Gõ *\"xem menu\"* để xem danh mục menu\n';
+        // speech += '• Gõ *\"xem khuyến mãi\"* để xem chương trình khuyến mãi tại quán\n';
+        // speech += '• Gõ *\"home, marika\"* để trở về danh mục chính\n';
+        // speech += '• Gõ *\"trợ giúp, help\"* để xem hướng dẫn sử dụng\n';
+        // speech += '• Gõ *\"feedback\"* để góp ý cho Receptioniest Marika';
+        // agent.add(new Text(speech));
     }
 
     buildCardItem(agent, product) {
