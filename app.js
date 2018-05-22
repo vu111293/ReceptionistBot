@@ -10,6 +10,7 @@ const { Carousel } = require('actions-on-google');
 const conf = require('./configure');
 const DataServer = require('./data-server.js');
 const util = require('util');
+const request = require('request');
 
 let uuidv4 = require('uuid/v4');
 let moment = require('moment');
@@ -20,23 +21,23 @@ let serviceAccount = require(conf.SERVER_KEY_PATH);
 let temp = 0;
 
 var mqtt = require('mqtt');
-var client = mqtt.connect('mqtt://m14.cloudmqtt.com', {
-    port: 11235,
-    username: 'cosllpth',
-    password: 'mDz0FLgPrYJB'
-});
+// var client = mqtt.connect('mqtt://m14.cloudmqtt.com', {
+//     port: 11235,
+//     username: 'cosllpth',
+//     password: 'mDz0FLgPrYJB'
+// });
 
-client.on('connect', function () {
-    client.subscribe('/gom/sensor/temperature')
-    //    client.publish('presence', 'Hello mqtt')
-})
+// client.on('connect', function () {
+//     client.subscribe('/gom/sensor/temperature')
+//     //    client.publish('presence', 'Hello mqtt')
+// })
 
-client.on('message', function (topic, message) {
-    // message is Buffer
-    console.log(topic + " ->" + message.toString())
-    temp = message;
-    client.end();
-})
+// client.on('message', function (topic, message) {
+//     // message is Buffer
+//     console.log(topic + " ->" + message.toString())
+//     temp = message;
+//     client.end();
+// })
 
 
 process.env.DEBUG = 'dialogflow:debug'; // enables lib debugging statements
@@ -90,6 +91,17 @@ var server = app.listen(app.get('port'), function () {
     console.log('App host %s', server.address().address);
     console.log('App listening on port %s', server.address().port);
     console.log('Press Ctrl+C to quit.');
+});
+
+app.get('/auth/redirect', function (request, res) {
+    let code = mDs.authCode(request.query.code);
+    request.get('https://slack.com/api/oauth.access?client_id=26587670230.340601737508&client_secret=7e3cc79f289771b5ee8ae1cb0448be6a&code=' + code,
+            function (error, reponse, body) {
+                console.log('error:', error); // Print the error if one occurred
+                // console.log('statusCode:', response && response.statusCode); // Print the response status code if a response was received
+                console.log('body:', body); // Print the HTML for the Google homepage.
+                res.status(200).send('Success');
+            });
 });
 
 app.post('/', function (request, response) {
