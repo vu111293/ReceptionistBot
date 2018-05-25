@@ -8,7 +8,7 @@ const { WebhookClient } = require('dialogflow-fulfillment');
 const { Card, Suggestion, Image, Text, Payload } = require('dialogflow-fulfillment');
 const { Carousel } = require('actions-on-google');
 const conf = require('./configure');
-const DataServer = require('./data-server.js');
+const mStorage = require('./data-server');
 const util = require('util');
 const request = require('request');
 
@@ -16,11 +16,14 @@ let uuidv4 = require('uuid/v4');
 let moment = require('moment');
 let express = require('express');
 let bodyParse = require('body-parser');
-let admin = require("firebase-admin", conf.SERVER_KEY_PATH);
-let serviceAccount = require(conf.SERVER_KEY_PATH);
+// let admin = require("firebase-admin");
+// let serviceAccount = require("./orderchatbot-firebase-admin.json");
 let temp = 0;
 
 var mqtt = require('mqtt');
+let rxhttp = require('rx-http-request').RxHttpRequest;
+let DialogflowUtils = require('./utils/DialogflowUtils');
+const intent = require('./IntentHandler');
 // var client = mqtt.connect('mqtt://m14.cloudmqtt.com', {
 //     port: 11235,
 //     username: 'cosllpth',
@@ -73,16 +76,20 @@ const TOPPING_MAP = [
 ];
 
 let mCurrentLang = NONE_LANG;
-let mDs = new DataServer();
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: conf.FIREBASE_URL
-});
 
-admin.database().ref('/').on('value', function (postSnapshot) {
-    mDs.parseFromFirebase(postSnapshot);
-});
+// admin.initializeApp({
+//     credential: admin.credential.cert(serviceAccount),
+//     databaseURL: "https://orderchatbot.firebaseio.com"
+// });
 
+// // As an admin, the app has access to read and write all data, regardless of Security Rules
+// var db = admin.database();
+// var ref = db.ref("/");
+// ref.on("value", function(snapshot) {
+//   console.log(snapshot.val());
+// });
+
+// let mStorage = new DataServer();
 let app = express();
 app.set('port', (process.env.PORT || 8080));
 app.use(bodyParse.json({ type: 'application/json' }));
@@ -93,15 +100,49 @@ var server = app.listen(app.get('port'), function () {
     console.log('Press Ctrl+C to quit.');
 });
 
+app.post('/reply', function (req, res) {
+
+    var options = {
+        headers: {
+            'Authorization': 'Bearer ' + req.body.token,
+            'Content-Type': 'application/json'
+        },
+
+        body: {
+            // 'token': req.body.token,
+            'channel': req.body.channel,
+            'text': req.body.text,
+            'username': req.body.username
+        },
+        json: true
+    }
+
+    rxhttp.post('https://slack.com/api/chat.postMessage', options)
+        .subscribe(
+            (data) => {
+                let code = data.response.statusCode;
+                if (code == 200) {
+                    console.log(data.response.toJSON());
+                    res.status(200).send('Ok');
+                } else {
+                    res.status(500).send('Error');
+                }
+            },
+            (err) => {
+                res.status(500).send('Error');
+            }
+        );
+});
+
 app.get('/auth/redirect', function (request, res) {
-    let code = mDs.authCode(request.query.code);
+    let code = mStorage.authCode(request.query.code);
     request.get('https://slack.com/api/oauth.access?client_id=26587670230.340601737508&client_secret=7e3cc79f289771b5ee8ae1cb0448be6a&code=' + code,
-            function (error, reponse, body) {
-                console.log('error:', error); // Print the error if one occurred
-                // console.log('statusCode:', response && response.statusCode); // Print the response status code if a response was received
-                console.log('body:', body); // Print the HTML for the Google homepage.
-                res.status(200).send('Success');
-            });
+        function (error, reponse, body) {
+            console.log('error:', error); // Print the error if one occurred
+            // console.log('statusCode:', response && response.statusCode); // Print the response status code if a response was received
+            console.log('body:', body); // Print the HTML for the Google homepage.
+            res.status(200).send('Success');
+        });
 });
 
 app.post('/', function (request, response) {
@@ -112,36 +153,6 @@ app.post('/', function (request, response) {
     console.log('Dialogflow Request headers: ' + JSON.stringify(request.headers));
     console.log('Dialogflow Request body: ' + JSON.stringify(request.body));
 
-    function googleAssistantOther(agent) {
-        // Get Actions on Google library conv instance
-        let conv = agent.conv();
-        // Use Actions on Google library to add responses
-        conv.ask('Please choose an item:')
-        conv.ask(new Carousel({
-            title: 'Google Assistant',
-            items: {
-                'WorksWithGoogleAssistantItemKey': {
-                    title: 'Works With the Google Assistant',
-                    description: 'If you see this logo, you know it will work with the Google Assistant.',
-                    image: {
-                        url: imageUrl,
-                        accessibilityText: 'Works With the Google Assistant logo',
-                    },
-                },
-                'GoogleHomeItemKey': {
-                    title: 'Google Home',
-                    description: 'Google Home is a powerful speaker and voice Assistant.',
-                    image: {
-                        url: imageUrl2,
-                        accessibilityText: 'Google Home',
-                    },
-                },
-            },
-        }))
-        // Add Actions on Google library responses to your agent's response
-        agent.add(conv);
-    }
-
     function welcome(agent) {
         if (mCurrentLang == VIETNAMESE_LANG) {
             agent.add('Marika cafe xin kính chào quý khách!');
@@ -150,105 +161,88 @@ app.post('/', function (request, response) {
         } else {
             agent.add('Welcome to Marika Cafe');
         }
-        mDs.buildHome(agent);
+        mStorage.buildHome(agent);
     }
 
-    function fallback(agent) {
-        let items = mDs.findKeywork(agent.query);
-        if (items != null && items.length > 0) {
-            agent.add('Ý bạn là: ');
-            if (items.length < 3) {
-                for (let item in items) {
-                    agent.add(new Suggestion(items[item]));
-                }
-            } else {
-                let speech = '';
-                for (let item in items) {
-                    speech += "• " + items[item] + "\n";
-                }
-                agent.add(speech);
-            }
-        } else {
-            agent.add('Xãy ra lỗi, vui lòng thử lại');
-            agent.add('Marika Cafe bot đang chạy thử nghiệm');
-            agent.add('Mong bạn góp ý cách gõ \"feedback\" để Bot hoàn thiện hơn');
-        }
-    }
+    // function fallback(agent) {
+    //     let items = mStorage.findKeywork(agent.query);
+    //     if (items != null && items.length > 0) {
+    //         agent.add('Ý bạn là: ');
+    //         if (items.length < 3) {
+    //             for (let item in items) {
+    //                 agent.add(new Suggestion(items[item]));
+    //             }
+    //         } else {
+    //             let speech = '';
+    //             for (let item in items) {
+    //                 speech += "• " + items[item] + "\n";
+    //             }
+    //             agent.add(speech);
+    //         }
+    //     } else {
+    //         agent.add('Xãy ra lỗi, vui lòng thử lại');
+    //         agent.add('Marika Cafe bot đang chạy thử nghiệm');
+    //         agent.add('Mong bạn góp ý cách gõ \"feedback\" để Bot hoàn thiện hơn');
+    //     }
+    // }
 
-    function other(agent) {
-        agent.add(`This message is from Dialogflow's Cloud Functions for Firebase editor!`);
-        agent.add(new Card({
-            title: `Title: this is a card title`,
-            imageUrl: imageUrl,
-            text: `This is the body text of a card.  You can even use line\n  breaks and emoji! 💁`,
-            buttonText: 'This is a button',
-            buttonUrl: linkUrl
-        })
-        );
-        agent.add(new Suggestion(`Quick Reply`));
-        agent.add(new Suggestion(`Suggestion`));
-        agent.add(new Text('Yeah this is text'));
-        agent.add(new Image(imageUrl2));
-        agent.setContext({ name: 'weather', lifespan: 2, parameters: { city: 'Rome' } });
-    }
+    // function askProductAnyTopping(agent) {
+    //     let product = agent.parameters['product'];
+    //     let mProduct = mStorage.findProduct(product);
+    //     if (!mProduct) {
+    //         agent.add('Hiện tại không bán ' + product);
+    //         return;
+    //     }
 
-    function askProductAnyTopping(agent) {
-        let product = agent.parameters['product'];
-        let mProduct = mDs.findProduct(product);
-        if (!mProduct) {
-            agent.add('Hiện tại không bán ' + product);
-            return;
-        }
+    //     let quantity = agent.parameters['quantity'];
+    //     let topping = agent.parameters['topping'];
 
-        let quantity = agent.parameters['quantity'];
-        let topping = agent.parameters['topping'];
+    //     let parameters = {
+    //         'product': product,
+    //     };
+    //     if (quantity) {
+    //         parameters.quantity = quantity;
+    //     }
+    //     for (let i in topping) {
+    //         let sp = topping[i].split('-');
+    //         if (sp.length == 2) {
+    //             parameters[sp[0]] = sp[1];
+    //         }
+    //     }
 
-        let parameters = {
-            'product': product,
-        };
-        if (quantity) {
-            parameters.quantity = quantity;
-        }
-        for (let i in topping) {
-            let sp = topping[i].split('-');
-            if (sp.length == 2) {
-                parameters[sp[0]] = sp[1];
-            }
-        }
+    //     let event = findGroupEvent(mProduct.options);
+    //     if (event) {
+    //         agent.setFollowupEvent({
+    //             name: event,
+    //             parameters: parameters
+    //         });
+    //     } else {
+    //         agent.add('Hiện tại không bán ' + product);
+    //     }
+    // }
 
-        let event = findGroupEvent(mProduct.options);
-        if (event) {
-            agent.setFollowupEvent({
-                name: event,
-                parameters: parameters
-            });
-        } else {
-            agent.add('Hiện tại không bán ' + product);
-        }
-    }
+    // function askProducForOrder(agent) {
+    //     let product = agent.parameters['product']; // required
+    //     let mProduct = mStorage.findProduct(product);
+    //     if (mProduct) {
+    //         let event = findGroupEvent(mProduct.options);
+    //         if (event) {
+    //             agent.setFollowupEvent({
+    //                 name: event,
+    //                 parameters: {
+    //                     'product': product
+    //                 }
+    //             });
+    //         } else {
+    //             agent.add('Hiện tại không bán *' + product + '*. Vui lòng chọn sản phẩm khác');
+    //             mStorage.buildRichCategories(agent);
 
-    function askProducForOrder(agent) {
-        let product = agent.parameters['product']; // required
-        let mProduct = mDs.findProduct(product);
-        if (mProduct) {
-            let event = findGroupEvent(mProduct.options);
-            if (event) {
-                agent.setFollowupEvent({
-                    name: event,
-                    parameters: {
-                        'product': product
-                    }
-                });
-            } else {
-                agent.add('Hiện tại không bán *' + product + '*. Vui lòng chọn sản phẩm khác');
-                mDs.buildRichCategories(agent);
-
-            }
-        } else {
-            agent.add('Hiện tại không bán *' + product + '*. Vui lòng chọn sản phẩm khác');
-            mDs.buildRichCategories(agent);
-        }
-    }
+    //         }
+    //     } else {
+    //         agent.add('Hiện tại không bán *' + product + '*. Vui lòng chọn sản phẩm khác');
+    //         mStorage.buildRichCategories(agent);
+    //     }
+    // }
 
     function askLanguages(agent) {
         agent.add("Chọn ngôn ngữ của bạn (Select your language bellow)");
@@ -274,7 +268,7 @@ app.post('/', function (request, response) {
                 valid = false;
                 speech = "Ngôn ngữ bạn chọn không được hỗ trợ.";
             }
-            mDs.setLang(mCurrentLang);
+            mStorage.setLang(mCurrentLang);
             agent.add(speech);
         } else {
             agent.add("Ngôn ngữ bạn chọn chưa được hỗ trợ.");
@@ -287,22 +281,65 @@ app.post('/', function (request, response) {
 
     function paymentRequest(agent) {
         let cart = agent.getContext('shoppingcart');
-        if (!cart || !cart.parameters.items || cart.parameters.items.length == 0) {
-            agent.add('Bạn chưa chọn món. Xin mời bạn chọn');
-            return;
-        }
-
-        // build bill detail
-
-        agent.setFollowupEvent({
-            name: 'username-request-event',
-            parameters: {}
-        });
-        // createBill(agent, cart.parameters.items);
+        agent.add('Chọn hình thức thanh toán');
+        agent.add(new Suggestion("Tại quán"));
+        agent.add(new Suggestion("Ship tận nhà"));
     }
 
+    function paymentWithNoneShip(agent) {
+        console.log("none ship");
+    }
+
+    function paymentWithShip(agent) {
+        console.log("ship");
+
+        fillAccountRequest(agent);
+    }
+
+    function fillAccountRequest(agent) {
+        let userInfo = DialogflowUtils.parseUserInfo(agent);
+        let account = mStorage.createOrUpdate(userInfo);
+
+        if (account.name == null) {
+            agent.setFollowupEvent({
+                name: 'username-request-event',
+                parameters: {
+                    // 'account': account
+                }
+            });
+        } else {
+            // valid user infomation
+            let strReply = 'Thông tin đơn hàng\n';
+            strReply += 'Người nhận ' + account.name + '\n';
+            strReply += 'Mã người nhận ' + account.id;
+
+
+            agent.add(strReply);
+
+            let bill = getBillData(agent);
+            bill.account = account;
+            pushOrder(agent, bill);
+        }
+    }
+
+    function usernameRequest(agent) {
+        let username = agent.parameters['username'];
+        let userInfo = DialogflowUtils.parseUserInfo(agent);
+        let account = mStorage.updateUserName(userInfo, username);
+        fillAccountRequest(agent);
+
+        // createBill(agent, username);
+        // agent.setContext({
+        //     name: 'shoppingcart',
+        //     lifespan: 0,
+        //     parameters: null
+        // });
+    }
+
+
+
     function agreeContinueShopping(agent) {
-        mDs.buildRichCategories(agent);
+        mStorage.buildRichCategories(agent);
     }
 
     function cancelContinueShopping(agent) {
@@ -329,7 +366,7 @@ app.post('/', function (request, response) {
             parameters: null
         });
         agent.add('Giỏ hàng đã được xóa. Xin mời bạn chọn món');
-        mDs.buildRichCategories(agent);
+        mStorage.buildRichCategories(agent);
     }
 
     function cancelClearCart(agent) {
@@ -399,22 +436,14 @@ app.post('/', function (request, response) {
         viewCart(agent);
     }
 
-    function usernameRequest(agent) {
-        let username = agent.parameters['username'];
-        createBill(agent, username);
-        agent.setContext({
-            name: 'shoppingcart',
-            lifespan: 0,
-            parameters: null
-        });
-    }
+
 
     function askWithSugar(agent) {
         let product = agent.parameters['product'];
         let quantity = agent.parameters['quantity'];
         let sugar = agent.parameters['sugar'];
 
-        addToCart(agent, mDs.findProduct(product), quantity, {
+        addToCart(agent, mStorage.findProduct(product), quantity, {
             'sugar': sugar
         });
     }
@@ -422,7 +451,7 @@ app.post('/', function (request, response) {
     function askNoneTopping(agent) {
         let product = agent.parameters['product'];
         let quantity = agent.parameters['quantity'];
-        addToCart(agent, mDs.findProduct(product), quantity, null);
+        addToCart(agent, mStorage.findProduct(product), quantity, null);
     }
 
     function askNoneToppingCancel(agent) {
@@ -440,7 +469,7 @@ app.post('/', function (request, response) {
             let topping = agent.parameters['topping0' + (i + 1)];
             let mProduct;
             if (product) {
-                mProduct = mDs.findProduct(product);
+                mProduct = mStorage.findProduct(product);
                 if (mProduct === undefined) {
                     notfound.push(product);
                 }
@@ -477,28 +506,28 @@ app.post('/', function (request, response) {
         }
     }
 
-    function askMenu(agent) {
-        agent.setContext({
-            name: LIST_DISPLAY,
-            lifespan: 1,
-            parameters: {
-                name: 'categories',
-                items: mDs.buildCategories()
-            }
-        });
+    // function askMenu(agent) {
+    //     agent.setContext({
+    //         name: LIST_DISPLAY,
+    //         lifespan: 1,
+    //         parameters: {
+    //             name: 'categories',
+    //             items: mStorage.buildCategories()
+    //         }
+    //     });
 
-        if (SLACK_SUPPORT) {
-            let formal = agent.parameters['ask_formal'];
-            if (formal) {
-                agent.add('Bạn không cần dùng *\"' + formal + "\"* vậy đâu, ngại lắm =)");
-            }
+    //     if (SLACK_SUPPORT) {
+    //         let formal = agent.parameters['ask_formal'];
+    //         if (formal) {
+    //             agent.add('Bạn không cần dùng *\"' + formal + "\"* vậy đâu, ngại lắm =)");
+    //         }
 
-            // agent.add('Mời bạn tham khảo danh mục bên dưới');
-            mDs.buildRichCategories(agent);
-        } else {
-            agent.add('Xem danh mục trên màn hình');
-        }
-    }
+    //         // agent.add('Mời bạn tham khảo danh mục bên dưới');
+    //         mStorage.buildRichCategories(agent);
+    //     } else {
+    //         agent.add('Xem danh mục trên màn hình');
+    //     }
+    // }
 
     function askHot(agent) {
         agent.setContext({
@@ -506,7 +535,7 @@ app.post('/', function (request, response) {
             lifespan: 1,
             parameters: {
                 name: 'hot items',
-                items: mDs.buildHotItems()
+                items: mStorage.buildHotItems()
             }
         });
         agent.add('Xem món hot trên màn hình');
@@ -518,19 +547,19 @@ app.post('/', function (request, response) {
             lifespan: 1,
             parameters: {
                 name: 'drinks',
-                items: mDs.buildDrinkItems()
+                items: mStorage.buildDrinkItems()
             }
         });
 
         if (SLACK_SUPPORT) {
-            mDs.buildRichDrinks(agent);
+            mStorage.buildRichDrinks(agent);
         } else {
             agent.add('Xem danh mục thức uống màn hình');
         }
     }
 
     function askDrinkMore(agent) {
-        mDs.buildMoreRichDrinks(agent);
+        mStorage.buildMoreRichDrinks(agent);
     }
 
     function askFood(agent) {
@@ -539,18 +568,18 @@ app.post('/', function (request, response) {
             lifespan: 1,
             parameters: {
                 name: 'foods',
-                items: mDs.buildFoodItems()
+                items: mStorage.buildFoodItems()
             }
         });
         if (SLACK_SUPPORT) {
-            mDs.buildRichFoods(agent);
+            mStorage.buildRichFoods(agent);
         } else {
             agent.add('Xem danh mục món ăn màn hình');
         }
     }
 
     function askFoodMore(agent) {
-        mDs.buildMoreRichFoods(agent);
+        mStorage.buildMoreRichFoods(agent);
     }
 
     function askGifs(agent) {
@@ -559,11 +588,11 @@ app.post('/', function (request, response) {
             lifespan: 1,
             parameters: {
                 name: 'gifts',
-                items: mDs.buildGiftItems()
+                items: mStorage.buildGiftItems()
             }
         });
         if (SLACK_SUPPORT) {
-            mDs.buildRichGifts(agent);
+            mStorage.buildRichGifts(agent);
         } else {
             agent.add('Xem danh mục quà tặng trên màn hình');
         }
@@ -575,13 +604,13 @@ app.post('/', function (request, response) {
             lifespan: 1,
             parameters: {
                 name: 'promotions',
-                items: mDs.buildPromotions()
+                items: mStorage.buildPromotions()
             }
         });
 
         if (SLACK_SUPPORT) {
             agent.add('Các chương trình khuyến mãi tại Marika Cafe');
-            mDs.buildRichPromotions(agent);
+            mStorage.buildRichPromotions(agent);
         } else {
             agent.add('Xem chương trình khuyến mãi trên màn hình');
         }
@@ -589,14 +618,14 @@ app.post('/', function (request, response) {
 
     function askNoneCafe(agent) {
         if (SLACK_SUPPORT) {
-            mDs.buildRichNoneCafe(agent);
+            mStorage.buildRichNoneCafe(agent);
         } else {
             agent.add('Xem danh mục quà tặng trên màn hình');
         }
     }
 
     function askNoneCafeMore(agent) {
-        mDs.buildMoreRichNoneCafe(agent);
+        mStorage.buildMoreRichNoneCafe(agent);
     }
 
     function askDetail(agent) {
@@ -605,9 +634,9 @@ app.post('/', function (request, response) {
             product = agent.parameters['productevent'];
         }
 
-        let mProduct = mDs.findProduct(product);
+        let mProduct = mStorage.findProduct(product);
         if (mProduct) {
-            mDs.buildCardItem(agent, mProduct);
+            mStorage.buildCardItem(agent, mProduct);
             agent.add('Bạn muốn mua mấy ly?');
             for (let i = 1; i <= 5; ++i) {
                 agent.add(new Suggestion(i.toString()));
@@ -617,7 +646,7 @@ app.post('/', function (request, response) {
             // if (product.includes('menu') || product.includes('thực đơn'))
             agent.add('Không tìm thấy thông tin về *' + product + '*');
             agent.add('Vui lòng chọn sản phẩm khác');
-            mDs.buildRichCategories(agent);
+            mStorage.buildRichCategories(agent);
         }
     }
 
@@ -629,7 +658,7 @@ app.post('/', function (request, response) {
             if (product === undefined || !product) {
                 product = askContext.parameters['product'];
             }
-            let mProduct = mDs.findProduct(product);
+            let mProduct = mStorage.findProduct(product);
             if (mProduct) {
                 handleSingleItemWithTopping(mProduct, parseInt(quantity), null);
             } else {
@@ -637,7 +666,7 @@ app.post('/', function (request, response) {
             }
         } else {
             agent.add('Mời bạn chọn sản phẩm khác');
-            mDs.buildRichCategories(agent);
+            mStorage.buildRichCategories(agent);
         }
     }
 
@@ -659,7 +688,7 @@ app.post('/', function (request, response) {
     function askAnythings(agent) {
         let product = agent.parameters['product'];
         if (product) {
-            let mProduct = mDs.findProduct(product);
+            let mProduct = mStorage.findProduct(product);
             if (mProduct) {
                 agent.add('Bạn muốn mua hay xem *' + product + '*?');
                 agent.add(new Suggestion("MUA"));
@@ -688,11 +717,11 @@ app.post('/', function (request, response) {
                 });
             } else {
                 agent.add('Xãy ra lỗi. Vui lòng thử lại');
-                mDs.buildRichCategories(agent);
+                mStorage.buildRichCategories(agent);
             }
         } else {
             agent.add('Xãy ra lỗi. Vui lòng thử lại');
-            mDs.buildRichCategories(agent);
+            mStorage.buildRichCategories(agent);
         }
     }
 
@@ -701,21 +730,21 @@ app.post('/', function (request, response) {
         if (askThingContext) {
             let product = askThingContext.parameters['product'];
             if (product) {
-                let mProduct = mDs.findProduct(product);
+                let mProduct = mStorage.findProduct(product);
                 if (mProduct) {
                     handleSingleItemWithTopping(mProduct, 0, null);
                 } else {
                     agent.add('Không tìm thấy sản phẩm ' + product + '. Vui lòng thử sản phẩm khác');
-                    mDs.buildRichCategories(agent);
+                    mStorage.buildRichCategories(agent);
                 }
             } else {
                 agent.add('Xãy ra lỗi. Vui lòng thử lại');
-                mDs.buildRichCategories(agent);
+                mStorage.buildRichCategories(agent);
             }
         } else {
             agent.add('Xãy ra lỗi. Vui lòng thử lại');
-            mDs.buildRichCategories(agent);
-        }
+            mStorage.buildRichCategories(agent);
+        }   
     }
 
     // Handler IOT
@@ -748,6 +777,52 @@ app.post('/', function (request, response) {
     }
 
     // Support methods
+
+    function getBillData(agent) {
+        let items;
+        let cart = agent.getContext('shoppingcart');
+        if (cart && cart.parameters.items && cart.parameters.items.length > 0) {
+            items = cart.parameters.items;
+        } else {
+            return null;
+        }
+
+        let totalPrice = 0;
+        var options = [];
+        for (let i in items) {
+            totalPrice += parseInt(items[i].price);
+        }
+
+        return {
+            items: items,
+            // total: totalPrice
+        }
+    }
+
+    function pushOrder(agent, bill) {
+
+        // create new bill in firebase database
+        let dbBill = mStorage.createBill(bill);
+        let condition = "'marika-coffee' in topics";
+        // let topic = 'marika-coffee'
+
+        console.log(JSON.stringify(dbBill));
+
+        let message = {
+            notification: {
+                title: 'Hóa đơn mới',
+                body: 'Mã hóa đơn ' + dbBill.id,
+            },
+            data: {
+                'raw': JSON.stringify(dbBill)
+            },
+            condition: condition
+            // topic: topic
+        }
+        mStorage.pushMessage(message);
+        agent.add("Push done");
+    }
+
     function createBill(agent, username) {
         let items;
         let cart = agent.getContext('shoppingcart');
@@ -884,12 +959,12 @@ app.post('/', function (request, response) {
             }
             ret = true;
         }
-        agent.add('Tổng tộng *' + mDs.formatPrice(total) + '* đồng');
+        agent.add('Tổng tộng *' + mStorage.formatPrice(total) + '* đồng');
         return ret;
     }
 
     function removeFromCart(agent, product, quantity) {
-        let mProduct = mDs.findProduct(product);
+        let mProduct = mStorage.findProduct(product);
         let found = false;
         if (mProduct) {
             let cartcontext = agent.getContext('shoppingcart');
@@ -938,6 +1013,7 @@ app.post('/', function (request, response) {
         if (!items) { items = []; }
         quantity = parseInt(quantity);
         items.push({
+            'id': product.id,
             'name': product.name,
             'price': product.price,
             'quantity': quantity,
@@ -1025,7 +1101,7 @@ app.post('/', function (request, response) {
         let cart = agent.getContext('shoppingcart');
         if (!cart || !cart.parameters.items || cart.parameters.items.length == 0) {
             agent.add('Giỏ hàng rỗng. Xin mời bạn chọn món');
-            mDs.buildRichCategories(agent);
+            mStorage.buildRichCategories(agent);
             return;
         }
 
@@ -1038,7 +1114,7 @@ app.post('/', function (request, response) {
             total += parseInt(item.price * item.quantity);
         }
 
-        agent.add('Tổng tộng *' + mDs.formatPrice(total) + '* đồng');
+        agent.add('Tổng tộng *' + mStorage.formatPrice(total) + '* đồng');
         agent.add('Bạn có muốn tiếp tục mua hàng?');
         agent.add(new Suggestion("CÓ"));
         agent.add(new Suggestion("KHÔNG"));
@@ -1066,8 +1142,8 @@ app.post('/', function (request, response) {
     // Run the proper handler based on the matched Dialogflow intent
     let intentMap = new Map();
     intentMap.set('Default Welcome Intent', welcome);
-    intentMap.set('Default Fallback Intent', fallback);
-    intentMap.set('ask-product-order', askProducForOrder);
+    intentMap.set('Default Fallback Intent', intent.slackViewThing);
+    intentMap.set('ask-product-order', intent.slackViewProducForOrder);
 
     // handle languages
     intentMap.set('ask-languages', askLanguages);
@@ -1075,7 +1151,7 @@ app.post('/', function (request, response) {
 
 
     // handle ask order by topping
-    intentMap.set('ask-product-any-topping', askProductAnyTopping);
+    intentMap.set('ask-product-any-topping', intent.slackViewProductAnyTopping);
     intentMap.set('ask-with-sugar', askWithSugar);
     intentMap.set('ask-nonetopping', askNoneTopping);
     intentMap.set('ask-nonetopping-cancel', askNoneToppingCancel);
@@ -1083,7 +1159,9 @@ app.post('/', function (request, response) {
 
     // handle payment
     intentMap.set('ask-cart', askCart);
-    intentMap.set('payment-request', paymentRequest);
+    intentMap.set('payment-request', intent.slackPaymentRequest);
+    intentMap.set('payment-request-noneship', intent.slackPaymentWithNoneShip);
+    intentMap.set('payment-request-ship', intent.slackPaymentWithShip);
 
     // handler after add cart item
     intentMap.set('agree-continue-shopping', agreeContinueShopping);
@@ -1101,10 +1179,10 @@ app.post('/', function (request, response) {
     intentMap.set('username-request', usernameRequest);
 
     // menu handler
-    intentMap.set('ask-menu', askMenu);
+    intentMap.set('ask-menu', intent.slackViewMenu);
     intentMap.set('ask-hot', askHot);
-    intentMap.set('ask-drink', askDrink);
-    intentMap.set('ask-drink-more', askDrinkMore);
+    intentMap.set('ask-drink', intent.slackViewDrink);
+    intentMap.set('ask-drink-more', intent.slackViewMoreDrink);
     intentMap.set('ask-food', askFood);
     intentMap.set('ask-food-more', askFoodMore);
     intentMap.set('ask-gift', askGifs);
@@ -1112,14 +1190,14 @@ app.post('/', function (request, response) {
     intentMap.set('ask-none-cafe', askNoneCafe);
     intentMap.set('ask-none-cafe-more', askNoneCafeMore);
 
-    intentMap.set('ask-detail', askDetail);
+    intentMap.set('ask-detail', intent.slackViewDetail);
     intentMap.set('ask-detail-continue-purchase', askDetailContinuePurchase);
 
     // intentMap.set('ask-detail - yes', agreeDetailItem);
     // intentMap.set('ask-detail - no', cancelDetailItem);
 
     // ask anythings
-    intentMap.set('ask-anythings', askAnythings);
+    intentMap.set('ask-anythings', intent.slackViewThing);
     intentMap.set('ask-anythings-detail', askThingsDetail);
     intentMap.set('ask-anythings-purchase', askThingsPurchase);
 
@@ -1133,11 +1211,16 @@ app.post('/', function (request, response) {
     intentMap.set('help-request', helpRequest);
     intentMap.set('clear-context', clearContext);
 
-    if (agent.requestSource === agent.ACTIONS_ON_GOOGLE) {
-        intentMap.set(null, googleAssistantOther);
-    } else {
-        intentMap.set(null, other);
-    }
+    // if (agent.requestSource === agent.ACTIONS_ON_GOOGLE) {
+    //     intentMap.set(null, googleAssistantOther);
+    // } else {
+    //     intentMap.set(null, other);
+    // }
 
-    agent.handleRequest(intentMap);
+    if (agent.locale === 'en') {
+        agent.handleRequest(intentMap);
+    } else if (agent.locale === 'fr') {
+        // agent.handleRequest(frIntentMap);
+    }
+    // agent.handleRequest(intentMap);
 });

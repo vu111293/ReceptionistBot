@@ -6,6 +6,8 @@ const MARIKA_HOMEPAGE_URL = 'http://marika.cafe/';
 const SLACK_SUPPORT = true;
 const MAX_ITEM_VIEW = 10;
 const request = require('request');
+let accountService = require('./services/AccountService');
+const fbService = require('./services/FirebaseService');
 
 class DataServer {
 
@@ -17,8 +19,50 @@ class DataServer {
         this.gifts = [];
         this.nonecafe = [];
         this.promotions = [];
-
         this.lang = 'no';
+
+        var self = this;
+        // console.log(Object.keys(this));
+        fbService.loadData(function (postSnapshot) {
+            accountService.setAccountList(postSnapshot.accountlist);
+            self.drinks = [];
+            for (let i in postSnapshot.drinklist) {
+                let item = postSnapshot.drinklist[i];
+                if (item.displaycashier) {
+                    self.drinks.push(item);
+                }
+            }
+
+            self.foods = [];
+            for (let i in postSnapshot.foodlist) {
+                let item = postSnapshot.foodlist[i];
+                if (item.displaycashier) {
+                    self.foods.push(item);
+                }
+            }
+
+            self.nonecafe = [];
+            for (let i in postSnapshot.nonecafelist) {
+                let item = postSnapshot.nonecafelist[i];
+                if (item.displaycashier) {
+                    self.nonecafe.push(item);
+                }
+            }
+
+            self.categories = postSnapshot.categories;
+            self.gifts = postSnapshot.giftList;
+            self.promotions = postSnapshot.promotions;
+
+            self.allproducts = [];
+            for (let i in self.drinks) { self.allproducts.push(self.drinks[i]); }
+            for (let i in self.foods) { self.allproducts.push(self.foods[i]); }
+            for (let i in self.nonecafe) { self.allproducts.push(self.nonecafe[i]); }
+            // this.allproducts = this.allproducts.concat(this.drinks);
+            // this.allproducts = this.allproducts.concat(this.foods);
+            // this.allproducts = this.allproducts.concat(this.nonecafe);
+
+            console.log('done parse from firebase');
+        });
     }
 
     setLang(lnaguage) {
@@ -33,44 +77,32 @@ class DataServer {
         return this.foods;
     }
 
-    parseFromFirebase(postSnapshot) {
-        this.drinks = [];
-        for (let i in postSnapshot.val().drinklist) {
-            let item = postSnapshot.val().drinklist[i];
-            if (item.displaycashier) {
-                this.drinks.push(item);
-            }
+    // Bill
+    createBill(bill) {
+        return fbService.create("bills/", bill);
+    }
+
+    pushMessage(message) {
+        return fbService.push(message);
+    }
+
+    // Account settion
+    createOrUpdate(userInfo) {
+        let account = accountService.findAccountByAgent(userInfo);
+        if (account == null) {
+            account = accountService.createAccount(userInfo);
         }
+        return account;
+    }
 
-        this.foods = [];
-        for (let i in postSnapshot.val().foodlist) {
-            let item = postSnapshot.val().foodlist[i];
-            if (item.displaycashier) {
-                this.foods.push(item);
-            }
+    updateUserName(userInfo, username) {
+        let account = accountService.findAccountByAgent(userInfo);
+        if (account == null) {
+            account = this.createOrUpdate(userInfo);
         }
-
-        this.nonecafe = [];
-        for (let i in postSnapshot.val().nonecafelist) {
-            let item = postSnapshot.val().nonecafelist[i];
-            if (item.displaycashier) {
-                this.nonecafe.push(item);
-            }
-        }
-
-        this.categories = postSnapshot.val().categories;
-        this.gifts = postSnapshot.val().giftList;
-        this.promotions = postSnapshot.val().promotions;
-
-        this.allproducts = [];
-        for (let i in this.drinks) { this.allproducts.push(this.drinks[i]); }
-        for (let i in this.foods) { this.allproducts.push(this.foods[i]); }
-        for (let i in this.nonecafe) { this.allproducts.push(this.nonecafe[i]); }
-        // this.allproducts = this.allproducts.concat(this.drinks);
-        // this.allproducts = this.allproducts.concat(this.foods);
-        // this.allproducts = this.allproducts.concat(this.nonecafe);
-
-        console.log('done parse from firebase');
+        account.name = username;
+        fbService.updateAccount(account);
+        return account;
     }
 
     findKeywork(query) {
@@ -87,7 +119,13 @@ class DataServer {
             for (let index in nameList) {
                 let name = nameList[index];
                 if (name.includes(query) == true) {
-                    items.push(item.name);
+                    let found = false;
+                    items.forEach(entity => {
+                        if (entity.name.toLowerCase() == name) {
+                            found = true;
+                        }
+                    });
+                    if (!found) { items.push(item); }
                     break;
                 }
             }
@@ -136,6 +174,18 @@ class DataServer {
         return list;
     }
 
+
+    getCategoriesInSuggestion() {
+        let ret = [];
+        for (let i in this.categories) {
+            let item = this.categories[i];
+            let suggestion = new Suggestion(item.name);
+            suggestion.setReply(item.name);
+            ret.push(suggestion);
+        }
+        return ret;
+    }
+
     buildRichCategories(agent) {
         // agent.add('Danh mục sản phẩm');
         for (let i in this.categories) {
@@ -171,6 +221,30 @@ class DataServer {
             });
         }
         return list;
+    }
+
+
+    getDrinkList(maxitem) {
+        let items = [];
+        let max = Math.min(maxitem, this.drinks.length);
+        for (let i = 0; i < max; ++i) {
+            let item = (util.format("• *%s* - (%s)\n",
+                this.drinks[i].name,
+                this.formatPrice(this.drinks[i].price)))
+            items.push(item);
+        }
+        return items;
+    }
+
+    getMoreDrinkList(from) {
+        let items = [];
+        for (let i = from; i < this.drinks.length; ++i) {
+            let item = util.format("• *%s* - (%s)\n",
+                this.drinks[i].name,
+                this.formatPrice(this.drinks[i].price));
+            items.push(item);
+        }
+        return items;
     }
 
     buildRichDrinks(agent) {
@@ -419,4 +493,4 @@ class DataServer {
     }
 }
 
-module.exports = DataServer;
+module.exports = new DataServer();
