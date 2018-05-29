@@ -11,6 +11,7 @@ module.exports = function (app) {
 
         let account = mAccoutService.findAccountById(accountId);
         if (account) {
+            console.log("Channel " + account.slack_info.channel);
             let message = (confirm == 'ok')
                 ? 'Đơn hàng sẽ được giao đến bạn sau *' + Number(parseInt(time) / 60).toFixed(0) + ' phút*.\n Cảm ơn bạn đã sử dụng dịch vụ.'
                 : 'Hiện tại dịch vụ đang bận. Vui lòng thử lại sau';

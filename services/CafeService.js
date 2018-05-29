@@ -10,7 +10,7 @@ class CafeService {
     callAPIPushSlackMessage(channel, message) {
         var options = {
             headers: {
-                'Authorization': 'Bearer xoxp-26587670230-50175140002-369300653282-86dfded24ca31f4c9e3d19c3ee30802b',
+                'Authorization': 'Bearer xoxp-26587670230-50175140002-371617991731-9ec4512e00e6453b7362cea636ad55c6',
                 'Content-Type': 'application/json'
             },
     
