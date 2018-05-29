@@ -1,5 +1,6 @@
 let Promise = require('promise');
 let rxhttp = require('rx-http-request').RxHttpRequest;
+let mStorage = require('../data-server');
 
 class CafeService {
 
@@ -10,7 +11,7 @@ class CafeService {
     callAPIPushSlackMessage(channel, message) {
         var options = {
             headers: {
-                'Authorization': 'Bearer xoxp-26587670230-50175140002-371617991731-9ec4512e00e6453b7362cea636ad55c6',
+                'Authorization': mStorage.getConfig().slack_token,
                 'Content-Type': 'application/json'
             },
     

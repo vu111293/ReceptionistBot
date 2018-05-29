@@ -34,6 +34,7 @@ class IntentHandler {
         // } else {
         //     agent.add('Welcome to Marika Cafe');
         // }
+        console.log(agent.requestSource);
         buidlTitle(agent, 'Marika cafe xin kính chào quý khách!');
         builMenuList(agent);
     }

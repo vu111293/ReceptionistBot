@@ -19,12 +19,14 @@ class DataServer {
         this.gifts = [];
         this.nonecafe = [];
         this.promotions = [];
+        this.config = '';
         this.lang = 'no';
 
         var self = this;
         // console.log(Object.keys(this));
         fbService.loadData(function (postSnapshot) {
             accountService.setAccountList(postSnapshot.accountlist);
+            self.config = postSnapshot.config;
             self.drinks = [];
             for (let i in postSnapshot.drinklist) {
                 let item = postSnapshot.drinklist[i];
@@ -72,6 +74,10 @@ class DataServer {
     // getDrinkList() {
     //     return this.drinks;
     // }
+
+    getConfig() {
+        return this.config;
+    }
 
     getFoodList() {
         return this.foods;

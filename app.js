@@ -60,20 +60,20 @@ const IMAGE_DISPLAY = 'image-display-ui';
 const CHART_DISPLAY = 'chart-display-ui';
 
 
-const TOPPING_MAP = [
-    {
-        topping: ["sugar"],
-        event: "askw-sugar-event"
-    },
-    {
-        topping: ["sugar", "cream"],
-        event: "askw-sugar-cream-event"
-    },
-    {
-        topping: ["milk"],
-        event: "askw-milk-event"
-    }
-];
+// const TOPPING_MAP = [
+//     {
+//         topping: ["sugar"],
+//         event: "askw-sugar-event"
+//     },
+//     {
+//         topping: ["sugar", "cream"],
+//         event: "askw-sugar-cream-event"
+//     },
+//     {
+//         topping: ["milk"],
+//         event: "askw-milk-event"
+//     }
+// ];
 
 let mCurrentLang = NONE_LANG;
 
@@ -157,120 +157,120 @@ app.post('/', function (request, response) {
    
     // Support methods
 
-    function getBillData(agent) {
-        let items;
-        let cart = agent.getContext('shoppingcart');
-        if (cart && cart.parameters.items && cart.parameters.items.length > 0) {
-            items = cart.parameters.items;
-        } else {
-            return null;
-        }
+    // function getBillData(agent) {
+    //     let items;
+    //     let cart = agent.getContext('shoppingcart');
+    //     if (cart && cart.parameters.items && cart.parameters.items.length > 0) {
+    //         items = cart.parameters.items;
+    //     } else {
+    //         return null;
+    //     }
 
-        let totalPrice = 0;
-        var options = [];
-        for (let i in items) {
-            totalPrice += parseInt(items[i].price);
-        }
+    //     let totalPrice = 0;
+    //     var options = [];
+    //     for (let i in items) {
+    //         totalPrice += parseInt(items[i].price);
+    //     }
 
-        return {
-            items: items,
-            // total: totalPrice
-        }
-    }
+    //     return {
+    //         items: items,
+    //         // total: totalPrice
+    //     }
+    // }
 
-    function pushOrder(agent, bill) {
+    // function pushOrder(agent, bill) {
 
-        // create new bill in firebase database
-        let dbBill = mStorage.createBill(bill);
-        let condition = "'marika-coffee' in topics";
-        // let topic = 'marika-coffee'
+    //     // create new bill in firebase database
+    //     let dbBill = mStorage.createBill(bill);
+    //     let condition = "'marika-coffee' in topics";
+    //     // let topic = 'marika-coffee'
 
-        console.log(JSON.stringify(dbBill));
+    //     console.log(JSON.stringify(dbBill));
 
-        let message = {
-            notification: {
-                title: 'Hóa đơn mới',
-                body: 'Mã hóa đơn ' + dbBill.id,
-            },
-            data: {
-                'raw': JSON.stringify(dbBill)
-            },
-            condition: condition
-            // topic: topic
-        }
-        mStorage.pushMessage(message);
-        agent.add("Push done");
-    }
+    //     let message = {
+    //         notification: {
+    //             title: 'Hóa đơn mới',
+    //             body: 'Mã hóa đơn ' + dbBill.id,
+    //         },
+    //         data: {
+    //             'raw': JSON.stringify(dbBill)
+    //         },
+    //         condition: condition
+    //         // topic: topic
+    //     }
+    //     mStorage.pushMessage(message);
+    //     agent.add("Push done");
+    // }
 
-    function createBill(agent, username) {
-        let items;
-        let cart = agent.getContext('shoppingcart');
-        if (cart && cart.parameters.items && cart.parameters.items.length > 0) {
-            items = cart.parameters.items;
-        } else {
-            agent.add('Giỏ hàng rỗng. Vui lòng chọn món');
-            return;
-        }
+    // function createBill(agent, username) {
+    //     let items;
+    //     let cart = agent.getContext('shoppingcart');
+    //     if (cart && cart.parameters.items && cart.parameters.items.length > 0) {
+    //         items = cart.parameters.items;
+    //     } else {
+    //         agent.add('Giỏ hàng rỗng. Vui lòng chọn món');
+    //         return;
+    //     }
 
-        let totalPrice = 0;
-        var options = [];
-        for (let i in items) {
-            totalPrice += parseInt(items[i].price);
-        }
+    //     let totalPrice = 0;
+    //     var options = [];
+    //     for (let i in items) {
+    //         totalPrice += parseInt(items[i].price);
+    //     }
 
-        // create new bill in firebase database
-        let uid = uuidv4();
-        admin.database().ref('/buillstack/' + uid).set({
-            id: uid,
-            username: username,
-            orderlist: items,
-            created: moment.now()
-        });
+    //     // create new bill in firebase database
+    //     let uid = uuidv4();
+    //     admin.database().ref('/buillstack/' + uid).set({
+    //         id: uid,
+    //         username: username,
+    //         orderlist: items,
+    //         created: moment.now()
+    //     });
 
-        let condition = "'marika-coffee' in topics";
-        // let topic = 'marika-coffee'
-        let message = {
-            notification: {
-                title: 'Hóa đơn mới',
-                body: 'Tổng hóa đơn ' + totalPrice + ' đồng.',
-            },
-            data: {
-                type: 'take-away',
-                orderId: uid,
-                // ,
-                // body: JSON.stringify(options)
-            },
-            condition: condition
-            // topic: topic
-        }
-        admin.messaging().send(message)
-            .then((response) => {
-                console.log('Successfully sent message:', response);
-            })
-            .catch((error) => {
-                console.log('Error sending message:', error);
-            });
+    //     let condition = "'marika-coffee' in topics";
+    //     // let topic = 'marika-coffee'
+    //     let message = {
+    //         notification: {
+    //             title: 'Hóa đơn mới',
+    //             body: 'Tổng hóa đơn ' + totalPrice + ' đồng.',
+    //         },
+    //         data: {
+    //             type: 'take-away',
+    //             orderId: uid,
+    //             // ,
+    //             // body: JSON.stringify(options)
+    //         },
+    //         condition: condition
+    //         // topic: topic
+    //     }
+    //     admin.messaging().send(message)
+    //         .then((response) => {
+    //             console.log('Successfully sent message:', response);
+    //         })
+    //         .catch((error) => {
+    //             console.log('Error sending message:', error);
+    //         });
 
-        agent.add('Yêu cầu của bạn đã được gửi đến Marika Cafe');
-        agent.add('Cảm ơn *' + username + '* đã sử dụng dịch vụ.')
-        agent.add('Xin vui lòng đợi phục vụ');
-        agent.add('__*** *** ');
-        agent.add('_********* ');
-        agent.add('___***** ');
-        agent.add('_____* ');
-        agent.add('Mong bạn góp ý cách gõ *\"feedback\"* để Bot hoàn thiện hơn');
-    }
+    //     agent.add('Yêu cầu của bạn đã được gửi đến Marika Cafe');
+    //     agent.add('Cảm ơn *' + username + '* đã sử dụng dịch vụ.')
+    //     agent.add('Xin vui lòng đợi phục vụ');
+    //     agent.add('__*** *** ');
+    //     agent.add('_********* ');
+    //     agent.add('___***** ');
+    //     agent.add('_____* ');
+    //     agent.add('Mong bạn góp ý cách gõ *\"feedback\"* để Bot hoàn thiện hơn');
+    // }
 
 
-    function setLanguagesContext(lang) {
-        agent.setContext({
-            name: 'languages',
-            lifespan: 0,
-            parameters: {
-                "response_lang": lang
-            }
-        });
-    }
+    // function setLanguagesContext(lang) {
+    //     agent.setContext({
+    //         name: 'languages',
+    //         lifespan: 0,
+    //         parameters: {
+    //             "response_lang": lang
+    //         }
+    //     });
+    // }
 
     // Run the proper handler based on the matched Dialogflow intent
     let intentMap = new Map();
