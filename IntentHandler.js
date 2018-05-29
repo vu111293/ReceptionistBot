@@ -216,10 +216,12 @@ class IntentHandler {
     }
 
     slackPaymentWithNoneShip(agent) {
+        setBillShipMethod(agent, false);
         fillAccountRequest(agent);
     }
 
     slackPaymentWithShip(agent) {
+        setBillShipMethod(agent, true);
         fillAccountRequest(agent, true);
     }
 
@@ -781,11 +783,21 @@ function getAccount(agent) {
     return mStorage.createOrUpdate(userInfo);
 }
 
+function setBillShipMethod(agent, ship) {
+    let cartcontext = agent.getContext('shoppingcart');
+    if (cartcontext) {
+        cartcontext.parameters.ship = ship;
+    }
+    agent.setContext(cartcontext);
+} 
+
 function getBillData(agent) {
     let items;
     let cart = agent.getContext('shoppingcart');
+    let shipMethod;
     if (cart && cart.parameters.items && cart.parameters.items.length > 0) {
         items = cart.parameters.items;
+        shipMethod = cart.parameters.ship;
     } else {
         return null;
     }
@@ -798,6 +810,7 @@ function getBillData(agent) {
 
     return {
         items: items,
+        ship: shipMethod
         // total: totalPrice
     }
 }
@@ -822,9 +835,9 @@ function pushOrder(agent, bill) {
         condition: condition
         // topic: topic
     }
-    // mStorage.pushMessage(message);
+    mStorage.pushMessage(message);
     buidlTitle(agent, 'trạng thái đơn hàng');
-    let txtResponse = '*ĐƠN HÀNG ĐÃ GỬI*';
+    let txtResponse = '*ĐƠN HÀNG ĐÃ GỬI*\n';
     txtResponse += 'Vui lòng đợi xác nhận từ Marika';
     agent.add(txtResponse);
 }
@@ -853,7 +866,7 @@ function buildSuggesions(agent, options, cartDisp = false) {
     if (cartDisp) {
         let numOfItems = getNumOfItemsInCart(agent);
         if (numOfItems > 0) {
-            agent.add(new Suggestion('THANH TOÁN (' + numOfItems + ')'));
+            agent.add(new Suggestion('THANH TOÁN'));
         }
     }
 }

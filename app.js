@@ -1,7 +1,7 @@
 'use strict';
 
 // HEROKU HOST
-// https://coffeeshop-bot.herokuapp.com
+// https://cofffee-shop.herokuapp.com/
 
 const functions = require('firebase-functions');
 const { WebhookClient } = require('dialogflow-fulfillment');
@@ -355,10 +355,11 @@ app.post('/', function (request, response) {
     //     intentMap.set(null, other);
     // }
 
-    if (agent.locale === 'en') {
-        agent.handleRequest(intentMap);
-    } else if (agent.locale === 'fr') {
-        // agent.handleRequest(frIntentMap);
-    }
+    agent.handleRequest(intentMap);
+    // if (agent.locale === 'en') {
+    //     agent.handleRequest(intentMap);
+    // } else if (agent.locale === 'fr') {
+    //     // agent.handleRequest(frIntentMap);
+    // }
     // agent.handleRequest(intentMap);
 });
