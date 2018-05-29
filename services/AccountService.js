@@ -16,13 +16,13 @@ class AccountService {
 
     createAccount(userInfo) {
         let account = {}
-        switch(userInfo.source) {
+        switch (userInfo.source) {
             case 'slack':
                 account.slack_info = {
                     channel: userInfo.info.channel,
                     userid: userInfo.info.userid
-                } 
-                break;  
+                }
+                break;
         }
         fbService.createAccount(account);
         return account;
@@ -33,14 +33,14 @@ class AccountService {
     }
 
     findAccount(phone) {
-        return new Promise(function(resolve, reject) {
+        return new Promise(function (resolve, reject) {
             if (this.accountList == null) {
                 reject('Account list empty');
             } else {
                 let account;
                 for (let i in this.accountList) {
                     if (this.accountList[i].phone == phone) {
-                        account = accountList[i];
+                        account = this.accountList[i];
                         break;
                     }
                 }
@@ -51,6 +51,17 @@ class AccountService {
                 }
             }
         });
+    }
+
+    findAccountById(id) {
+        let account;
+        for (let i in this.accountList) {
+            if (this.accountList[i].id == id) {
+                account = this.accountList[i];
+                break;
+            }
+        }
+        return account;
     }
 
     findAccountBySlackId(slackId) {

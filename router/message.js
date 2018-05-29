@@ -1,5 +1,6 @@
 let rxhttp = require('rx-http-request').RxHttpRequest;
-const mStorage = require('..//data-server');
+const mAccoutService = require('../services/AccountService');
+const mCafeService = require('../services/CafeService');
 
 module.exports = function (app) {
 
@@ -8,42 +9,19 @@ module.exports = function (app) {
         let confirm = req.body.confirm; // 'ok/cancel'
         let time = req.body.time; // 'min'
 
-        let account = mStorage.findAccountById(accountId);
-
-
-    });
-
-    app.post('/reply', function (req, res) {
-
-        var options = {
-            headers: {
-                'Authorization': 'Bearer ' + req.body.token,
-                'Content-Type': 'application/json'
-            },
-    
-            body: {
-                // 'token': req.body.token,
-                'channel': req.body.channel,
-                'text': req.body.text,
-                'username': req.body.username
-            },
-            json: true
+        let account = mAccoutService.findAccountById(accountId);
+        if (account) {
+            let message = (confirm == 'ok')
+                ? 'Đơn hàng sẽ được giao đến bạn sau *' + Number(parseInt(time) / 60).toFixed(0) + ' phút*.\n Cảm ơn bạn đã sử dụng dịch vụ.'
+                : 'Hiện tại dịch vụ đang bận. Vui lòng thử lại sau';
+            mCafeService.callAPIPushSlackMessage(
+                account.slack_info.channel, message)
+                .then((rs) => res.status(200).send(rs))
+                .catch((err) => res.status(500).send('Can\'t push to customer'));
+        } else {
+            res.status(500).send('Account not found')
         }
-    
-        rxhttp.post('https://slack.com/api/chat.postMessage', options)
-            .subscribe(
-                (data) => {
-                    let code = data.response.statusCode;
-                    if (code == 200) {
-                        console.log(data.response.toJSON());
-                        res.status(200).send('Ok');
-                    } else {
-                        res.status(500).send('Error');
-                    }
-                },
-                (err) => {
-                    res.status(500).send('Error');
-                }
-            );
     });
 }
+
+
