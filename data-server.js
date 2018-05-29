@@ -69,9 +69,9 @@ class DataServer {
         this.lang = lnaguage;
     }
 
-    getDrinkList() {
-        return this.drinks;
-    }
+    // getDrinkList() {
+    //     return this.drinks;
+    // }
 
     getFoodList() {
         return this.foods;
@@ -101,6 +101,26 @@ class DataServer {
             account = this.createOrUpdate(userInfo);
         }
         account.name = username;
+        fbService.updateAccount(account);
+        return account;
+    }
+
+    updatePhone(userInfo, phone) {
+        let account = accountService.findAccountByAgent(userInfo);
+        if (account == null) {
+            account = this.createOrUpdate(userInfo);
+        }
+        account.phone = phone;
+        fbService.updateAccount(account);
+        return account;
+    }
+
+    updateAddress(userInfo, address) {
+        let account = accountService.findAccountByAgent(userInfo);
+        if (account == null) {
+            account = this.createOrUpdate(userInfo);
+        }
+        account.address = address;
         fbService.updateAccount(account);
         return account;
     }
@@ -204,6 +224,10 @@ class DataServer {
         });
     }
 
+    getHotItems() {
+        return [];
+    }
+
     buildHotItems() {
         return [];
     }
@@ -246,6 +270,54 @@ class DataServer {
         }
         return items;
     }
+
+    getFoodList(maxitem) {
+        let items = [];
+        let max = Math.min(maxitem, this.foods.length);
+        for (let i = 0; i < max; ++i) {
+            let item = (util.format("• *%s* - (%s)\n",
+                this.foods[i].name,
+                this.formatPrice(this.foods[i].price)))
+            items.push(item);
+        }
+        return items;
+    }
+
+    getMoreFoodList(from) {
+        let items = [];
+        for (let i = from; i < this.foods.length; ++i) {
+            let item = util.format("• *%s* - (%s)\n",
+                this.foods[i].name,
+                this.formatPrice(this.foods[i].price));
+            items.push(item);
+        }
+        return items;
+    }
+
+    getNoCafeList(maxitem) {
+        let items = [];
+        let max = Math.min(maxitem, this.nonecafe.length);
+        for (let i = 0; i < max; ++i) {
+            let item = (util.format("• *%s* - (%s)\n",
+                this.nonecafe[i].name,
+                this.formatPrice(this.nonecafe[i].price)))
+            items.push(item);
+        }
+        return items;
+    }
+
+    getMoreNoCafeList(from) {
+        let items = [];
+        for (let i = from; i < this.nonecafe.length; ++i) {
+            let item = util.format("• *%s* - (%s)\n",
+                this.nonecafe[i].name,
+                this.formatPrice(this.nonecafe[i].price));
+            items.push(item);
+        }
+        return items;
+    }
+
+
 
     buildRichDrinks(agent) {
         if (this.drinks !== undefined) {

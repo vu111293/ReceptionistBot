@@ -1,4 +1,4 @@
-
+const util = require('util');
 const { Card, Suggestion, Image, Text, Payload } = require('dialogflow-fulfillment');
 const DialogflowUtils = require('./utils/DialogflowUtils');
 const mStorage = require('./data-server');
@@ -26,6 +26,49 @@ class IntentHandler {
 
     }
 
+    slackWelcome(agent) {
+        // if (mCurrentLang == VIETNAMESE_LANG) {
+        //     agent.add('Marika cafe xin kính chào quý khách!');
+        // } else if (mCurrentLang == JAPANESE_LANG) {
+        //     agent.add('GOOGLE');
+        // } else {
+        //     agent.add('Welcome to Marika Cafe');
+        // }
+        buidlTitle(agent, 'Marika cafe xin kính chào quý khách!');
+        builMenuList(agent);
+    }
+
+    slackAskLanguages(agent) {
+        buidlTitle(agent, "Chọn ngôn ngữ của bạn (Select your language bellow)");
+        buildSuggesions(agent, ['việt nam', 'english', 'japanese']);
+    }
+
+    slackAskLanguagesResponse(agent) {
+        let lang = agent.parameters['lang'];
+        if (lang) {
+            let speech = "";
+            if (lang == 'Việt Nam') {
+                mCurrentLang = VIETNAMESE_LANG;
+                speech = "Bạn đã chọn ngôn ngữ Tiếng Việt.";
+            } else if (lang == 'English') {
+                mCurrentLang = ENGLIST_LANG;
+                speech = "English language was selected";
+            } else if (lang == 'Japanese') {
+                mCurrentLang = JAPANESE_LANG;
+                speech = "日本語が選ばれました。";
+            } else {
+                valid = false;
+                speech = "Ngôn ngữ bạn chọn không được hỗ trợ.";
+            }
+            mStorage.setLang(mCurrentLang);
+            agent.add(speech);
+        } else {
+            agent.add("Ngôn ngữ bạn chọn chưa được hỗ trợ.");
+        }
+    }
+
+
+
     slackViewMenu(agent) {
         // agent.setContext({
         //     name: LIST_DISPLAY,
@@ -41,30 +84,66 @@ class IntentHandler {
         if (formal) {
             agent.add('Bạn không cần dùng *\"' + formal + "\"* vậy đâu, ngại lắm =)");
         }
-        buildCategoriesUI(agent);
+        builMenuList(agent);
         // } else {
         //     agent.add('Xem danh mục trên màn hình');
         // }
     }
 
     slackViewDrink(agent) {
-        let items = mStorage.getDrinkList(MAX_ITEM);
-        if (items.length > 0) {
-            buidlTitle(agent, 'thức uống');
-            buildListUI(agent, items);
-        } else {
-            agent.add('Không có sản phẩm');
-        }
-        buildSuggesions(agent, ['xem thêm', 'giỏ hàng', 'menu', 'thanh toán']);
+        commonListDisplay(
+            agent,
+            'thức uống',
+            mStorage.getDrinkList(MAX_ITEM),
+            ['xem thêm', 'giỏ hàng', 'menu']);
     }
 
     slackViewMoreDrink(agent) {
-        let items = mStorage.getMoreDrinkList(MAX_ITEM);
-        if (items.length > 0) {
-            buidlTitle(agent, 'tiếp theo')
-            buildListUI(agent, items);
-        }
-        buildSuggesions(agent, ['giỏ hàng', 'menu', 'thanh toán']);
+        commonListDisplay(
+            agent,
+            'tiếp theo',
+            mStorage.getMoreDrinkList(MAX_ITEM),
+            ['giỏ hàng', 'menu']);
+    }
+
+    slackViewFood(agent) {
+        commonListDisplay(
+            agent,
+            'món ăn',
+            mStorage.getFoodList(MAX_ITEM),
+            ['xem thêm', 'giỏ hàng', 'menu']);
+    }
+
+    slackViewMoreFood(agent) {
+        commonListDisplay(
+            agent,
+            'tiếp theo',
+            mStorage.getMoreFoodList(MAX_ITEM),
+            ['giỏ hàng', 'menu']);
+    }
+
+    slackViewNoCafe(agent) {
+        commonListDisplay(
+            agent,
+            'sản phẩm',
+            mStorage.getNoCafeList(MAX_ITEM),
+            ['xem thêm', 'giỏ hàng', 'menu']);
+    }
+
+    slackViewMoreNoCafe(agent) {
+        commonListDisplay(
+            agent,
+            'tiếp theo',
+            mStorage.getMoreNoCafeList(MAX_ITEM),
+            ['giỏ hàng', 'menu']);
+    }
+
+    slackViewHot(agent) {
+        commonListDisplay(
+            agent,
+            'món phổ biến',
+            mStorage.getHotItems(MAX_ITEM),
+            ['xem thêm', 'giỏ hàng', 'menu']);
     }
 
     slackViewThing(agent) {
@@ -101,11 +180,31 @@ class IntentHandler {
         let mProduct = mStorage.findProduct(product);
         if (mProduct) {
             mStorage.buildCardItem(agent, mProduct);
-            buidlTitle(agent, 'Bạn muốn mua mấy ly?');
+            buidlTitle(agent, 'Chọn số lượng ?');
             buildNumberSelection(agent);
         } else {
             agent.add('Không tìm thấy thông tin về *' + product + '*');
             agent.add('Vui lòng chọn sản phẩm khác');
+            // mStorage.buildRichCategories(agent);
+        }
+    }
+
+    slackViewDetailContinuePurchase(agent) {
+        let quantity = agent.parameters['quantity'];
+        if (quantity) {
+            let askContext = agent.getContext('ask-detail-followup');
+            let product = askContext.parameters['productevent'];
+            if (product === undefined || !product) {
+                product = askContext.parameters['product'];
+            }
+            let mProduct = mStorage.findProduct(product);
+            if (mProduct) {
+                handleSingleItemWithTopping(agent, mProduct, parseInt(quantity), null);
+            } else {
+                agent.add(product + ' chưa được kinh doanh tại quán. Xin vui lòng thử lại');
+            }
+        } else {
+            agent.add('Mời bạn chọn sản phẩm khác');
             // mStorage.buildRichCategories(agent);
         }
     }
@@ -121,21 +220,18 @@ class IntentHandler {
     }
 
     slackPaymentWithShip(agent) {
-        fillAccountRequest(agent);
+        fillAccountRequest(agent, true);
     }
 
-    slackUsernameRequest(agent) {
-        let username = agent.parameters['username'];
-        let userInfo = DialogflowUtils.parseUserInfo(agent);
-        let account = mStorage.updateUserName(userInfo, username);
-        fillAccountRequest(agent);
+    slackPaymentContinue(agent) {
+        let account = getAccount(agent);
+        let bill = getBillData(agent);
+        bill.account = account;
+        pushOrder(agent, bill);
+    }
 
-        // createBill(agent, username);
-        // agent.setContext({
-        //     name: 'shoppingcart',
-        //     lifespan: 0,
-        //     parameters: null
-        // });
+    slackPaymentShipEdit(agent) {
+        buildShipEditSuggestion(agent);
     }
 
     slackViewProductAnyTopping(agent) {
@@ -148,7 +244,7 @@ class IntentHandler {
 
         let quantity = agent.parameters['quantity'];
 
-        if(!quantity) {
+        if (!quantity) {
             agent.setFollowupEvent({
                 name: 'ask-detail-event',
                 lifespan: 2,
@@ -186,6 +282,70 @@ class IntentHandler {
         }
     }
 
+    slackAskWithSugar(agent) {
+        let product = agent.parameters['product'];
+        let quantity = agent.parameters['quantity'];
+        let sugar = agent.parameters['sugar'];
+
+        addToCart(agent, mStorage.findProduct(product), quantity, {
+            'sugar': sugar
+        });
+    }
+
+    slackAskNoneTopping(agent) {
+        let product = agent.parameters['product'];
+        let quantity = agent.parameters['quantity'];
+        addToCart(agent, mStorage.findProduct(product), quantity, null);
+        buildSuggesions(agent, ['menu', 'giỏ hàng'], true);
+    }
+
+    slackMultiOrder(agent) {
+        let request = [];
+        let notfound = [];
+        const maxCount = 4;
+        for (let i = 0; i < maxCount; ++i) {
+            let product = agent.parameters['item0' + (i + 1)];
+            let quantity = agent.parameters['quantity0' + (i + 1)];
+            let topping = agent.parameters['topping0' + (i + 1)];
+            let mProduct;
+            if (product) {
+                mProduct = mStorage.findProduct(product);
+                if (mProduct === undefined) {
+                    notfound.push(product);
+                }
+            }
+            if (mProduct && quantity) {
+                let options = [];
+                for (let i in topping) {
+                    let sp = topping[i].split('-');
+                    if (sp.length == 2) {
+                        options[sp[0]] = sp[1];
+                    }
+                }
+
+                request.push({
+                    product: mProduct,
+                    quantity: quantity,
+                    options: options
+                });
+            }
+        }
+        if (request.length > 0 || notfound.length > 0) {
+            if (request.length > 0) {
+                if (request.length == 1 && notfound.length == 0) { // single case -> ask topping
+                    handleSingleItemWithTopping(agent, request[0].product, request[0].quantity, request[0].options);
+                } else {
+                    addMultiToCart(agent, request);
+                }
+            }
+            if (notfound.length > 0) {
+                agent.add('Hiện tại không bán ' + notfound.join(', ') + '. Xin chọn sản phẩm khác');
+            }
+        } else {
+            agent.add('Xin vui lòng thử lại');
+        }
+    }
+
     slackViewProducForOrder(agent) {
         let product = agent.parameters['product']; // required
         let mProduct = mStorage.findProduct(product);
@@ -220,7 +380,341 @@ class IntentHandler {
             mStorage.buildRichCategories(agent);
         }
     }
-    
+
+    slackViewCart(agent) {
+        displayCart(agent);
+        if (isCartEmpty(agent)) {
+            builMenuList(agent);
+        } else {
+            buildSuggesions(agent, ['điều chỉnh giỏ hàng', 'menu'], true);
+        }
+    }
+
+    slackClearCart(agent) {
+        if (isCartEmpty(agent)) {
+            buidlTitle(agent, 'giỏ hàng rỗng');
+        } else {
+            buidlTitle(agent, 'Bạn có muốn xóa giỏ hàng hiện tại?');
+            buildSuggesions(agent, ['có', 'không']);
+        }
+    }
+
+    slackEditCart(agent) {
+        if (isCartEmpty(agent)) {
+            buidlTitle(agent, 'giỏ hàng rỗng');
+        } else {
+            // agent.setFollowupEvent({
+            //     name: 'remove-item-cart-event',
+            //     lifespan: 1,
+            //     parameters: {
+            //         // 'product': product
+            //     }
+            // });
+
+            let product = agent.parameters['product'];
+            if (product !== "") {
+                buidlTitle(agent, 'Bạn muốn xóa sản phẩm *' + product + '* trong giỏ hàng?')
+            } else {
+                // displayCart(agent);
+                buidlTitle(agent, 'Bạn muốn xóa sản phẩm nào?');
+                buildRemoveItemsSugession(agent);
+            }
+        }
+    }
+
+    slackRemoveCartItem(agent) {
+        let product = agent.parameters['product'];
+        let quantity = agent.parameters['quantity'];
+        if (product) {
+            if (!quantity) {
+                quantity = -1;
+            }
+            if (removeItemInCart(agent, product, quantity)) {
+                if (quantity > 0) {
+                    agent.add(util.format('Đã xóa %s *%s* khỏi danh sách.', quantity, product));
+                } else {
+                    agent.add(util.format('Đã xóa *%s* khỏi danh sách.', product));
+                }
+            } else {
+                agent.add('Không tìm thấy *' + product + '* trong giỏ hàng.');
+            }
+        } else {
+            agent.add('Không tìm thấy sản phẩm *' + product + '* trong giỏ hàng');
+        }
+
+        displayCart(agent);
+        buildSuggesions(agent, ['điều chỉnh giỏ hàng', 'menu'], true);
+    }
+
+    slackAgreeRemoveCartItem(agent) {
+        let context = agent.getContext('edit-cart-request-followup');
+        if (context && context.parameters.product) {
+            slackRemoveCartItem(agent);
+        } else {
+            agent.add('Không tìm thấy sản phẩm bạn yêu cầu trong giỏ hàng');
+        }
+    }
+
+    slackCancelRemoveCartItem(agent) {
+        // agent.add('Oke');
+        // viewCart(agent);
+    }
+
+    slackAgreeClearCart(agent) {
+        clearCart(agent);
+        buidlTitle(agent, 'xóa giỏ hàng thành công');
+    }
+
+    slackCancelClearCart(agent) {
+        buildSuggesions(agent, ['menu']);
+    }
+
+
+    // Payment session
+
+    slackUserNameRequest(agent) {
+        let editMode = agent.getContext('ship-edit') != null;
+        let username = agent.parameters['username'];
+        let ship = agent.parameters['ship'];
+        if (ship == null) {
+            console.log('@not handler ship is nil');
+        }
+
+        let userInfo = DialogflowUtils.parseUserInfo(agent);
+        let account = mStorage.updateUserName(userInfo, username);
+
+        if (editMode) {
+            buildShipInfo(agent);
+            buildShipEditSuggestion(agent);
+            buildSuggesions(agent, [], true);
+        } else {
+            fillAccountRequest(agent, ship);
+        }
+    }
+
+    slackPhoneRequest(agent) {
+        let editMode = agent.getContext('ship-edit') != null;
+        let phone = agent.parameters['phone'];
+        let ship = agent.parameters['ship'];
+        if (ship == null) {
+            console.log('@not handler ship is nil');
+        }
+        let userInfo = DialogflowUtils.parseUserInfo(agent);
+        let account = mStorage.updatePhone(userInfo, phone);
+        if (editMode) {
+            buildShipInfo(agent);
+            buildShipEditSuggestion(agent);
+            buildSuggesions(agent, [], true);
+        } else {
+            fillAccountRequest(agent, ship);
+        }
+    }
+
+    slackAddressRequest(agent) {
+        let editMode = agent.getContext('ship-edit') != null;
+        let address = agent.parameters['address'];
+        let ship = agent.parameters['ship'];
+        if (ship == null) {
+            console.log('@not handler ship is nil');
+        }
+
+        let userInfo = DialogflowUtils.parseUserInfo(agent);
+        let account = mStorage.updateAddress(userInfo, address);
+        if (editMode) {
+            buildShipInfo(agent);
+            buildShipEditSuggestion(agent);
+            buildSuggesions(agent, [], true);
+        } else {
+            fillAccountRequest(agent, ship);
+        }
+    }
+
+    slackFeedback(agent) {
+        let feedback = agent.parameters["feedback"];
+        saveFeedback(feedback);
+        agent.add("Chân thành cảm ơn góp ý của bạn. Chúc bạn 1 ngày vui vẻ tại Marika Cafe");
+        // agent.add(new Suggestion('HOME'));
+    }
+
+    slackHelpRequest(agent) {
+        agent.add('Marika xin kính chào quí khách');
+        agent.add('Chi nhánh 74/13/4 Trương Quốc Dung, Phú Nhuận');
+        agent.add('Gõ \"cho {số lượng} {tên món}\" để thêm món');
+        agent.add('Gõ \"giỏ hàng\" để xem giỏ hàng hiện tại');
+        agent.add('Gõ \"thanh toán\" để gửi yêu cầu đến Receptioniest Marika');
+        agent.add('Gõ \"feedback\" để góp ý cho Receptioniest Marika');
+        agent.add('Gõ \"\"')
+    }
+
+    slackClearContext(agent) {
+        agent.clearOutgoingContexts();
+        // agent.setLanguagesContext(mCurrentLang);
+        // welcome(agent);
+    }
+
+}
+
+function buildShipEditSuggestion(agent) {
+    buildSuggesions(agent, ['sửa tên', 'thay đổi địa chỉ', 'thay đổi SĐT']);
+    agent.setContext({
+        name: 'ship-edit',
+        lifespan: 1,
+        parameters: null
+    });
+}
+
+function buildShipInfo(agent, ship = true) {
+    let account = getAccount(agent);
+    buidlTitle(agent, 'Thông tin khách hàng');
+    let strReply = '';
+    strReply += '• Người nhận: *' + account.name.toUpperCase() + '*\n';
+    strReply += '• Điện thoại: *' + account.phone + '*\n';
+    strReply += ship ? '• Địa chỉ: *' + account.address.toUpperCase() + '*\n' : '• Nhận hàng tại quán\n';
+    agent.add(strReply);
+}
+
+function saveFeedback(feedback) {
+    let key = admin.database().ref('feedbacks').push().key;
+    admin.database().ref('feedbacks/' + key).set({
+        created: moment.now(),
+        fb: feedback
+    });
+}
+
+function handleSingleItemWithTopping(agent, product, quantity, topping) {
+    let parameters = {
+        'product': product.name,
+    };
+    if (quantity > 0) {
+        parameters.quantity = quantity;
+    }
+    // for (let i in topping) {
+    //     let sp = topping[i].split('-');
+    //     if (sp.length == 2) {
+    //         parameters[sp[0]] = sp[1];
+    //     }
+    // }
+
+    if (topping) {
+        for (let k in topping) {
+            parameters[k] = topping[k];
+        }
+    }
+
+    let event = findGroupEvent(product.options);
+    if (event) {
+        agent.setFollowupEvent({
+            name: event,
+            parameters: parameters
+        });
+    } else {
+        agent.add('Hiện tại không bán ' + product);
+    }
+}
+
+function commonListDisplay(agent, title, items, options) {
+    if (items.length > 0) {
+        buidlTitle(agent, title);
+        buildListUI(agent, items);
+        agent.add('(Gợi ý: gõ tên món bạn chọn, ví dụ: pepsi)');
+    } else {
+        agent.add('Không có sản phẩm');
+    }
+    buildSuggesions(agent, options, true);
+}
+
+function removeItemInCart(agent, product, quantity) {
+    let mProduct = mStorage.findProduct(product);
+    let found = false;
+    if (mProduct) {
+        let cartcontext = agent.getContext('shoppingcart');
+        if (cartcontext != null && cartcontext.parameters.items != null) {
+            let newItems = [];
+            for (let i in cartcontext.parameters.items) {
+                let item = cartcontext.parameters.items[i];
+                if (mProduct.name.includes(item.name)) {
+                    found = true;
+                    if (quantity > 0 && item.quantity - quantity > 0) {
+                        item.quantity -= quantity;
+                        newItems.push(item);
+                    }
+                } else {
+                    newItems.push(item);
+                }
+            }
+            cartcontext.parameters.items = newItems;
+        }
+        agent.setContext(cartcontext);
+    }
+    return found;
+}
+
+function addToCart(agent, product, quantity, options) {
+    let cartcontext = agent.getContext('shoppingcart');
+    if (!cartcontext) {
+        cartcontext = {
+            name: 'shoppingcart',
+            lifespan: 50,
+            parameters: {
+                items: []
+            }
+        }
+    }
+
+    let items = cartcontext.parameters.items;
+    if (!items) { items = []; }
+    quantity = parseInt(quantity);
+    items.push({
+        'id': product.id,
+        'name': product.name,
+        'price': product.price,
+        'quantity': quantity,
+        'options': options
+    });
+    cartcontext.parameters = { 'items': items };
+    agent.setContext(cartcontext);
+
+    let txtResponse = ''
+    buidlTitle(agent, 'đã thêm');
+    txtResponse += util.format('• x%s *%s* - %s', quantity, product.name, convTopping(options));
+    agent.add(txtResponse);
+    // agent.add('Bạn có muốn tiếp tục mua hàng?');
+    // agent.add(new Suggestion("CÓ"));
+    // agent.add(new Suggestion("KHÔNG"));
+}
+
+function clearCart(agent) {
+    agent.setContext({
+        name: 'shoppingcart',
+        lifespan: 0,
+        parameters: null
+    });
+}
+
+function isCartEmpty(agent) {
+    let isEmpty = false;
+    let cart = agent.getContext('shoppingcart');
+    if (!cart || !cart.parameters.items || cart.parameters.items.length == 0) {
+        isEmpty = true;
+    }
+    return isEmpty;
+}
+
+function getNumOfItemsInCart(agent) {
+    let count = 0;
+    let cart = agent.getContext('shoppingcart');
+    if (cart && cart.parameters.items) {
+        count = cart.parameters.items.length;
+    }
+    return count;
+}
+
+function buildRemoveItemsSugession(agent) {
+    let count = 0;
+    let cart = agent.getContext('shoppingcart');
+    if (cart && cart.parameters.items) {
+        cart.parameters.items.forEach(item => agent.add(new Suggestion(('Xóa ' + item.name).toUpperCase())));
+    }
 }
 
 function findGroupEvent(options) {
@@ -246,7 +740,7 @@ function findGroupEvent(options) {
     return event;
 }
 
-function fillAccountRequest(agent) {
+function fillAccountRequest(agent, ship = false) {
     let userInfo = DialogflowUtils.parseUserInfo(agent);
     let account = mStorage.createOrUpdate(userInfo);
 
@@ -254,21 +748,37 @@ function fillAccountRequest(agent) {
         agent.setFollowupEvent({
             name: 'username-request-event',
             parameters: {
+                'ship': ship
+                // 'account': account
+            }
+        });
+    } else if (account.phone == null) {
+        agent.setFollowupEvent({
+            name: 'phone-request-event',
+            parameters: {
+                'ship': ship
+                // 'account': account
+            }
+        });
+    } else if (ship && account.address == null) {
+        agent.setFollowupEvent({
+            name: 'address-request-event',
+            parameters: {
+                'ship': ship
                 // 'account': account
             }
         });
     } else {
         // valid user infomation
-        buidlTitle(agent, 'Thông tin đơn hàng');
-        let strReply = '';
-        strReply += '• Người nhận *' + account.name + '*\n';
-        strReply += '• Mã người nhận *' + account.id + '*\n';
-        agent.add(strReply);
-
-        let bill = getBillData(agent);
-        bill.account = account;
-        pushOrder(agent, bill);
+        displayCart(agent);
+        buildShipInfo(agent, ship);
+        buildSuggesions(agent, ['tiếp tục', 'sửa đơn hàng', 'sửa thông tin nhận hàng']);
     }
+}
+
+function getAccount(agent) {
+    let userInfo = DialogflowUtils.parseUserInfo(agent);
+    return mStorage.createOrUpdate(userInfo);
 }
 
 function getBillData(agent) {
@@ -312,12 +822,16 @@ function pushOrder(agent, bill) {
         condition: condition
         // topic: topic
     }
-    mStorage.pushMessage(message);
-    agent.add("*ĐƠN HÀNG ĐÃ GỬI.* Vui lòng đợi xác nhận từ Marika.");
+    // mStorage.pushMessage(message);
+    buidlTitle(agent, 'trạng thái đơn hàng');
+    let txtResponse = '*ĐƠN HÀNG ĐÃ GỬI*';
+    txtResponse += 'Vui lòng đợi xác nhận từ Marika';
+    agent.add(txtResponse);
 }
 
-function buildCategoriesUI(agent) {
+function builMenuList(agent) {
     // agent.add('Gõ tên mục cần xem sản phẩm. Ví dụ: \"thức ăn\"');
+    // buidlTitle(agent, 'mời bạn xem menu');
     mStorage.getCategoriesInSuggestion()
         .forEach(item => agent.add(item));
     // add menu context
@@ -334,18 +848,78 @@ function buildListUI(agent, items) {
     agent.add(str);
 }
 
-function buildSuggesions(agent, options) {
+function buildSuggesions(agent, options, cartDisp = false) {
     options.forEach(item => agent.add(new Suggestion(item.toUpperCase())));
+    if (cartDisp) {
+        let numOfItems = getNumOfItemsInCart(agent);
+        if (numOfItems > 0) {
+            agent.add(new Suggestion('THANH TOÁN (' + numOfItems + ')'));
+        }
+    }
 }
 
 function buidlTitle(agent, title) {
-    agent.add('---- ' + title.toUpperCase() + ' ----');
+    agent.add('．\n\n\n ※ ' + title.toUpperCase() + ' ※');
 }
 
 function buildNumberSelection(agent) {
-    for (let i = 1; i <= 5; ++i) {
+    for (let i = 1; i <= 3; ++i) {
         agent.add(new Suggestion(i.toString()));
     }
-} 
+    agent.add(new Suggestion('KHÁC'));
+    agent.add(new Suggestion('CHỌN MÓN KHÁC'));
+}
+
+function displayCart(agent) {
+    let cart = agent.getContext('shoppingcart');
+    if (!cart || !cart.parameters.items || cart.parameters.items.length == 0) {
+        buidlTitle(agent, 'giỏ hàng rỗng');
+        return;
+    }
+
+    buidlTitle(agent, 'giỏ hàng');
+    let total = 0;
+    let txtResponse = '';
+    for (let i in cart.parameters.items) {
+        let item = cart.parameters.items[i];
+        txtResponse += util.format('• x%s *%s* - %s\n', parseInt(item.quantity), item.name, convTopping(item.options));
+        total += parseInt(item.price * item.quantity);
+    }
+
+    txtResponse += '______________________\n';
+    txtResponse += 'Tổng tộng: *' + mStorage.formatPrice(total) + '*\n';
+    agent.add(txtResponse);
+    // agent.add('Bạn có muốn tiếp tục mua hàng?');
+    // agent.add(new Suggestion("CÓ"));
+    // agent.add(new Suggestion("KHÔNG"));
+    // buildNextAction(agent, ["THANH TOÁN", "ĐIỀU CHỈNH", "HỦY ĐƠN HÀNG"]);
+}
+
+function convTopping(topping) {
+    let out = [];
+    if (topping) {
+        let added = false;
+        for (let k in topping) {
+            let item = '';
+            if (topping[k] == 'low') item = 'ít';
+            else if (topping[k] == 'high') item = 'nhiều';
+            else if (topping[k] == 'none') item = 'không';
+            else continue;
+
+            if (k == 'sugar') item += ' đường';
+            else if (k == 'milk') item += ' sữa';
+            else item += 'thing';
+            out.push(item);
+            added = true;
+        }
+        if (!added) {
+            out.push('bình thường');
+        }
+    } else {
+        out.push('bình thường');
+    }
+
+    return out.join(', ');
+}
 
 module.exports = new IntentHandler();
