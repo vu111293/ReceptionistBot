@@ -494,6 +494,12 @@ class IntentHandler {
     slackUserNameRequest(agent) {
         let editMode = agent.getContext('ship-edit') != null;
         let username = agent.parameters['username'];
+
+        if (isEmpty(username)) {
+            response(agent, 'Nhập tên bạn bên dưới');
+            return;
+        }
+
         let ship = agent.parameters['ship'];
         if (ship == null) {
             console.log('@not handler ship is nil');
@@ -513,6 +519,12 @@ class IntentHandler {
     slackPhoneRequest(agent) {
         let editMode = agent.getContext('ship-edit') != null;
         let phone = agent.parameters['phone'];
+
+        if (isEmpty(phone)) {
+            response(agent, 'Nhập số điện thoại');
+            return;
+        }
+
         let ship = agent.parameters['ship'];
         if (ship == null) {
             console.log('@not handler ship is nil');
@@ -530,6 +542,12 @@ class IntentHandler {
     slackAddressRequest(agent) {
         let editMode = agent.getContext('ship-edit') != null;
         let address = agent.parameters['address'];
+
+        if (isEmpty(address)) {
+            response(agent, 'Nhập địa chỉ nhận hàng bên dưới');
+            return;
+        }
+
         let ship = agent.parameters['ship'];
         if (ship == null) {
             console.log('@not handler ship is nil');
@@ -797,7 +815,7 @@ function fillAccountRequest(agent, ship = false) {
     let userInfo = DialogflowUtils.parseUserInfo(agent);
     let account = mStorage.createOrUpdate(userInfo);
 
-    if (account.name == null) {
+    if (isEmpty(account.name)) {
         agent.setFollowupEvent({
             name: 'username-request-event',
             parameters: {
@@ -805,7 +823,7 @@ function fillAccountRequest(agent, ship = false) {
                 // 'account': account
             }
         });
-    } else if (account.phone == null) {
+    } else if (isEmpty(account.phone)) {
         agent.setFollowupEvent({
             name: 'phone-request-event',
             parameters: {
@@ -813,7 +831,7 @@ function fillAccountRequest(agent, ship = false) {
                 // 'account': account
             }
         });
-    } else if (ship && account.address == null) {
+    } else if (ship && isEmpty(account.address)) {
         agent.setFollowupEvent({
             name: 'address-request-event',
             parameters: {
@@ -826,6 +844,10 @@ function fillAccountRequest(agent, ship = false) {
         //TODO: need show cart
         response(agent, 'thông tin đơn hàng', getShipInfo(agent, ship), ['tiếp tục', 'sửa đơn hàng', 'sửa thông tin nhận hàng']);
     }
+}
+
+function isEmpty(text) {
+    return text == null || text == '';
 }
 
 function getAccount(agent) {
@@ -1021,6 +1043,7 @@ function formatPrice(price) {
 
 function response(agent, title, content, options, speech) {
 
+    console.log("@Agent :" + agent.requestSource);
     if (agent.requestSource === null) {
         let rawJson = {
             title: title,

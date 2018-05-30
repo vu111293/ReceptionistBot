@@ -93,10 +93,10 @@ class DataServer {
     }
 
     // Account settion
-    createOrUpdate(userInfo) {
-        let account = accountService.findAccountByAgent(userInfo);
+    createOrUpdate(user) {
+        let account = accountService.findAccountByAgent(user);
         if (account == null) {
-            account = accountService.createAccount(userInfo);
+            account = accountService.createAccount(user);
         }
         return account;
     }
@@ -251,7 +251,7 @@ class DataServer {
         let items = [];
         let max = Math.min(maxitem, this.drinks.length);
         for (let i = 0; i < max; ++i) {
-            let item = (util.format("• *%s* - (%s)\n",
+            let item = (util.format("• *%s* - (%s)",
                 this.drinks[i].name,
                 this.formatPrice(this.drinks[i].price)))
             items.push(item);
@@ -262,7 +262,7 @@ class DataServer {
     getMoreDrinkList(from) {
         let items = [];
         for (let i = from; i < this.drinks.length; ++i) {
-            let item = util.format("• *%s* - (%s)\n",
+            let item = util.format("• *%s* - (%s)",
                 this.drinks[i].name,
                 this.formatPrice(this.drinks[i].price));
             items.push(item);
@@ -274,7 +274,7 @@ class DataServer {
         let items = [];
         let max = Math.min(maxitem, this.foods.length);
         for (let i = 0; i < max; ++i) {
-            let item = (util.format("• *%s* - (%s)\n",
+            let item = (util.format("• *%s* - (%s)",
                 this.foods[i].name,
                 this.formatPrice(this.foods[i].price)))
             items.push(item);
@@ -285,7 +285,7 @@ class DataServer {
     getMoreFoodList(from) {
         let items = [];
         for (let i = from; i < this.foods.length; ++i) {
-            let item = util.format("• *%s* - (%s)\n",
+            let item = util.format("• *%s* - (%s)",
                 this.foods[i].name,
                 this.formatPrice(this.foods[i].price));
             items.push(item);
@@ -297,7 +297,7 @@ class DataServer {
         let items = [];
         let max = Math.min(maxitem, this.nonecafe.length);
         for (let i = 0; i < max; ++i) {
-            let item = (util.format("• *%s* - (%s)\n",
+            let item = (util.format("• *%s* - (%s)",
                 this.nonecafe[i].name,
                 this.formatPrice(this.nonecafe[i].price)))
             items.push(item);
@@ -308,7 +308,7 @@ class DataServer {
     getMoreNoCafeList(from) {
         let items = [];
         for (let i = from; i < this.nonecafe.length; ++i) {
-            let item = util.format("• *%s* - (%s)\n",
+            let item = util.format("• *%s* - (%s)",
                 this.nonecafe[i].name,
                 this.formatPrice(this.nonecafe[i].price));
             items.push(item);
@@ -320,10 +320,10 @@ class DataServer {
 
     buildRichDrinks(agent) {
         if (this.drinks !== undefined) {
-            let speech = 'Xem danh mục thức uống bên dưới:\n';
+            let speech = 'Xem danh mục thức uống bên dưới:';
             let max = Math.min(MAX_ITEM_VIEW, this.drinks.length);
             for (let i = 0; i < max; ++i) {
-                speech += (util.format("• *%s* - (%s)\n",
+                speech += (util.format("• *%s* - (%s)",
                     this.drinks[i].name,
                     this.formatPrice(this.drinks[i].price)))
             }
@@ -344,7 +344,7 @@ class DataServer {
         if (this.drinks !== undefined && this.drinks.length > MAX_ITEM_VIEW) {
             let speech = '';
             for (let i = MAX_ITEM_VIEW; i < this.drinks.length; ++i) {
-                speech += util.format("• *%s* - (%s)\n",
+                speech += util.format("• *%s* - (%s)",
                     this.drinks[i].name,
                     this.formatPrice(this.drinks[i].price));
             }
@@ -360,7 +360,7 @@ class DataServer {
 
     buildRichFoods(agent) {
         if (this.foods !== undefined) {
-            let speech = 'Xem danh mục thức ăn bên dưới:\n';
+            let speech = 'Xem danh mục thức ăn bên dưới:';
             let max = Math.min(MAX_ITEM_VIEW, this.foods.length);
             for (let i = 0; i < max; ++i) {
                 speech += util.format("• *%s* - (%s)",
@@ -514,10 +514,10 @@ class DataServer {
             agent.add(new Suggestion("SEARCH"));
         }
 
-        // let speech = '• Gõ *\"xem menu\"* để xem danh mục menu\n';
-        // speech += '• Gõ *\"xem khuyến mãi\"* để xem chương trình khuyến mãi tại quán\n';
-        // speech += '• Gõ *\"home, marika\"* để trở về danh mục chính\n';
-        // speech += '• Gõ *\"trợ giúp, help\"* để xem hướng dẫn sử dụng\n';
+        // let speech = '• Gõ *\"xem menu\"* để xem danh mục menu';
+        // speech += '• Gõ *\"xem khuyến mãi\"* để xem chương trình khuyến mãi tại quán';
+        // speech += '• Gõ *\"home, marika\"* để trở về danh mục chính';
+        // speech += '• Gõ *\"trợ giúp, help\"* để xem hướng dẫn sử dụng';
         // speech += '• Gõ *\"feedback\"* để góp ý cho Receptioniest Marika';
         // agent.add(new Text(speech));
     }

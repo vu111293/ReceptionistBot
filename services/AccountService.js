@@ -14,13 +14,19 @@ class AccountService {
     }
 
 
-    createAccount(userInfo) {
+    createAccount(user) {
         let account = {}
-        switch (userInfo.source) {
-            case 'slack':
+        switch (user.source) {
+            case 'SLACK':
                 account.slack_info = {
-                    channel: userInfo.info.channel,
-                    userid: userInfo.info.userid
+                    channel: user.info.channel,
+                    userid: user.info.userid
+                }
+                break;
+
+            case 'CHATBOT':
+                account.chatbot = {
+                    sessionid: user.info.sessionid
                 }
                 break;
         }
@@ -79,9 +85,26 @@ class AccountService {
         }
     }
 
-    findAccountByAgent(userInfo) {
-        if (userInfo.source == 'slack') {
-            return this.findAccountBySlackId(userInfo.info.userid);
+    findAccountByChatbotSessionId(sessionId) {
+        if (this.accountList == null) {
+            return null;
+        } else {
+            let account = null;
+            for (let i in this.accountList) {
+                if (this.accountList[i].chatbot && this.accountList[i].chatbot.sessionid == sessionId) {
+                    account = this.accountList[i];
+                    break;
+                }
+            }
+            return account;
+        }
+    }
+
+    findAccountByAgent(user) {
+        if (user.source == 'SLACK') {
+            return this.findAccountBySlackId(user.info.userid);
+        } else if (user.source == 'CHATBOT') {
+            return this.findAccountByChatbotSessionId(user.info.sessionid);
         } else {
             return null;
         }
