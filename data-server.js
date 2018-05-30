@@ -201,15 +201,8 @@ class DataServer {
     }
 
 
-    getCategoriesInSuggestion() {
-        let ret = [];
-        for (let i in this.categories) {
-            let item = this.categories[i];
-            let suggestion = new Suggestion(item.name);
-            suggestion.setReply(item.name);
-            ret.push(suggestion);
-        }
-        return ret;
+    getCategories() {
+        return this.categories.map(item => item.name);
     }
 
     buildRichCategories(agent) {
