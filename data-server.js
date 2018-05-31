@@ -92,6 +92,18 @@ class DataServer {
         return fbService.push(message);
     }
 
+    pushMessageToTopic(topic, message) {
+        let condition = "\'" + topic + "\' in topics";
+        message.condition = condition
+        return fbService.push(message);
+    }
+
+    pushMessageToDevice(deviceToken, message) {
+        message.token = deviceToken;
+        return fbService.push(message);
+    }
+
+
     // Account settion
     createOrUpdate(user) {
         let account = accountService.findAccountByAgent(user);
@@ -133,6 +145,8 @@ class DataServer {
 
     findKeywork(query) {
         var items = [];
+        let matched;
+        let itemMatched;
         if (!query) { return items; }
 
         for (let key in this.allproducts) {
@@ -140,10 +154,20 @@ class DataServer {
             if (item.replacename == null) {
                 continue;
             }
+            matched = false;
             query = query.toLowerCase();
             let nameList = item.replacename.split(',');
             for (let index in nameList) {
                 let name = nameList[index];
+
+                // matching 100%
+                if (name == query) {
+                    itemMatched = item;
+                    matched = true;
+                    break;
+                }
+
+                // find relative
                 if (name.includes(query) == true) {
                     let found = false;
                     items.forEach(entity => {
@@ -155,7 +179,15 @@ class DataServer {
                     break;
                 }
             }
+
+            if (matched) {break;}
         }
+
+        
+        if (itemMatched != null) {
+            items = [itemMatched];
+        }
+
         return items;
     }
 

@@ -39,15 +39,16 @@ class FirebaseService {
         return model;
     }
 
-
     push(message) {
-        admin.messaging().send(message)
+        return new Promise(function(resolve, reject) {
+            admin.messaging().send(message)
             .then((response) => {
-                console.log('Successfully sent message:', response);
+                resolve(JSON.stringify(response));
             })
             .catch((error) => {
-                console.log('Error sending message:', error);
+                reject(JSON.stringify(error));
             });
+        });
     }
 }
 
