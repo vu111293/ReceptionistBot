@@ -43,7 +43,7 @@ module.exports = function (app) {
                 mCafeService.callAPIPushSlackMessage(
                     account.slack_info.channel, message)
                     .then((rs) => res.status(200).send(rs))
-                    .catch((err) => res.status(500).send({msg: {error: 'Can\'t push to customer'}}));
+                    .catch((err) => res.status(500).send({body: {error: 'Can\'t push to customer'}}));
             } else if (source == 'CHATBOT') {
                 if (account.chatbot.token) {
                     let fbMessage = {
@@ -62,13 +62,13 @@ module.exports = function (app) {
                         .then((rs) => res.status(200).send({body: {}}))
                         .catch((err) => res.status(500).send({body: {error: 'Can\'t push to customer'}}));
                 } else {
-                    res.status(500).send({msg: {error: 'Token was requred before'}});
+                    res.status(500).send({body: {error: 'Token was requred before'}});
                 }
             } else {
-                res.status(500).send({msg: {error:'Platform not support'}});
+                res.status(500).send({body: {error:'Platform not support'}});
             }
         } else {
-            res.status(500).send({msg: {error: 'Account not found'}});
+            res.status(500).send({body: {error: 'Account not found'}});
         }
     });
 
