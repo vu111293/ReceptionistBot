@@ -39,17 +39,36 @@ module.exports = function (app) {
 
             if (source == 'SLACK' && account.slack_info.channel) {
                 console.log("Channel " + account.slack_info.channel);
+                console.log('Sending message to SLACK @@');
                 mCafeService.callAPIPushSlackMessage(
                     account.slack_info.channel, message)
                     .then((rs) => res.status(200).send(rs))
-                    .catch((err) => res.status(500).send('Can\'t push to customer'));
-            } else if (source == 'CHATBOT' && account.chatbot.token) {
-                mStorage.pushMessageToDevice(account.chatbot.token, message)
-                    .then((rs) => res.status(200).send(rs))
-                    .catch((err) => res.status(500).send('Can\'t push to customer'));
+                    .catch((err) => res.status(500).send({msg: {error: 'Can\'t push to customer'}}));
+            } else if (source == 'CHATBOT') {
+                if (account.chatbot.token) {
+                    let fbMessage = {
+                        // notification: {
+                        //     title: 'Hóa đơn mới',
+                        //     body: 'Mã hóa đơn '
+                        // },
+                        data: {
+                            text: message
+                        },
+                        token: account.chatbot.token
+                    }
+                    console.log(fbMessage);
+                    console.log('Sending message to CHATBOT @@');
+                    mStorage.pushMessageToDevice(fbMessage)
+                        .then((rs) => res.status(200).send({body: {}}))
+                        .catch((err) => res.status(500).send({body: {error: 'Can\'t push to customer'}}));
+                } else {
+                    res.status(500).send({msg: {error: 'Token was requred before'}});
+                }
+            } else {
+                res.status(500).send({msg: {error:'Platform not support'}});
             }
         } else {
-            res.status(500).send('Account not found');
+            res.status(500).send({msg: {error: 'Account not found'}});
         }
     });
 

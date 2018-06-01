@@ -46,6 +46,7 @@ class FirebaseService {
                 resolve(JSON.stringify(response));
             })
             .catch((error) => {
+                console.log(error);
                 reject(JSON.stringify(error));
             });
         });

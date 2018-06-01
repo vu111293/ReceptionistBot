@@ -98,8 +98,7 @@ class DataServer {
         return fbService.push(message);
     }
 
-    pushMessageToDevice(deviceToken, message) {
-        message.token = deviceToken;
+    pushMessageToDevice(message) {
         return fbService.push(message);
     }
 

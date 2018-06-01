@@ -515,7 +515,7 @@ class IntentHandler {
         }
 
         // displayCart(agent);
-        response(agent, title, null, ['thanh toán', 'điều chỉnh giỏ hàng', 'menu']);
+        response(agent, title, getItemsInCart(agent), ['thanh toán', 'điều chỉnh giỏ hàng', 'menu']);
     }
 
     slackAgreeRemoveCartItem(agent) {
@@ -716,7 +716,7 @@ function removeItemInCart(agent, product, quantity) {
             let newItems = [];
             for (let i in cartcontext.parameters.items) {
                 let item = cartcontext.parameters.items[i];
-                if (mProduct.name.includes(item.name)) {
+                if (incLowerCase(mProduct.name, item.name)) {
                     found = true;
                     if (quantity > 0 && item.quantity - quantity > 0) {
                         item.quantity -= quantity;
@@ -749,7 +749,7 @@ function addToCart(agent, product, quantity, options) {
     if (!items) { items = []; }
     quantity = parseInt(quantity);
     items.push({
-        'id': product.id,
+        'id': product.product_id,
         'name': product.name,
         'price': product.price,
         'quantity': quantity,
@@ -757,7 +757,6 @@ function addToCart(agent, product, quantity, options) {
     });
     cartcontext.parameters = { 'items': items };
     agent.setContext(cartcontext);
-
 
     response(agent, 'đã thêm',
         util.format('• x%s *%s* - %s', quantity, product.name, convTopping(options)),
@@ -833,7 +832,7 @@ function getItemsSugession(agent) {
     let sugessionItems = [];
     let cart = agent.getContext('shoppingcart');
     if (cart && cart.parameters.items) {
-        cart.parameters.items.forEach(item => sugessionItems.push('Xóa ' + item.name).toUpperCase());
+        cart.parameters.items.forEach(item => sugessionItems.push(('Xóa ' + item.name).toUpperCase()));
     }
     return sugessionItems;
 }
@@ -893,7 +892,7 @@ function fillAccountRequest(agent, ship = false) {
         // valid user infomation
         //TODO: need show cart
         response(agent, 'thông tin đơn hàng', getShipInfo(agent, ship),
-            ['tiếp tục', 'sửa đơn hàng', 'sửa thông tin nhận hàng'], ''
+            ['tiếp tục', 'sửa đơn hàng', 'sửa thông tin nhận hàng'], '',
             [FCM_REQUIRE_CMD]);
     }
 }
@@ -975,6 +974,8 @@ function pushOrder(agent, bill) {
     let responseItems = [];
     responseItems.push('*ĐƠN HÀNG ĐÃ GỬI*');
     responseItems.push('Vui lòng đợi xác nhận từ Marika');
+    
+    clearCart(agent);
     response(agent, 'trạng thái đơn hàng', responseItems);
 }
 
@@ -984,6 +985,18 @@ function addContextMenu(agent) {
         lifespan: 2,
         parameters: {}
     });
+}
+
+function getItemsInCart(agent) {
+    let responseItems = [];
+    if (isCartEmpty(agent) == false) {
+        let cart = agent.getContext('shoppingcart');
+        for (let i in cart.parameters.items) {
+            let item = cart.parameters.items[i];
+            responseItems.push(util.format('• x%s *%s* - %s', parseInt(item.quantity), item.name, convTopping(item.options)));
+        }
+    }
+    return responseItems;
 }
 
 function displayCart(agent) {
@@ -1064,6 +1077,10 @@ function formatPrice(price) {
 }
 
 function isString(value) { return typeof value === 'string'; }
+
+function incLowerCase(v1, v2) {
+    return v1.toLowerCase().includes(v2.toLowerCase());
+}
 
 function response(agent, title, content, options, speech, cmd) {
     console.log("@Agent :" + agent.requestSource);

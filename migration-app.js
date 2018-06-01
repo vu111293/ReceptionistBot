@@ -40,7 +40,7 @@ http.request(options, function (res) {
             migrate(result.productDtos);
             // for (let i in result.productDtos) {
             //     let product = result.productDtos[i];
-            //     console.log(product.name);
+            //     console.log(JSON.stringify(product));
             // }
 
         } catch (e) {
@@ -56,25 +56,26 @@ const NONE_CATEGORY_ID = "59ae24231d1fa23fb84718f8";
 
 // Support methods
 function migrate(products) {
-    let catDrinkId = NONE_CATEGORY_ID;
+    let catDrinkId = DRINK_CATEGORY_ID;
     let raw = "";
     for (let i in products) {
         let product = products[i];
-        console.log('\"' + product.name.toLowerCase() + '\",\"' + product.name.toLowerCase() + "\"");
-        // if (product.category_id == catDrinkId) {
-        //     addToFirebase(product);
-        //     console.log("added " + product.name);
-        // }
+        // console.log('\"' + product.name.toLowerCase() + '\",\"' + product.name.toLowerCase() + "\"");
+        if (product.category_id == catDrinkId) {
+            addToFirebase(product);
+            console.log("added " + product.name);
+        }
     }
     console.log(raw);
 }
 
 function addToFirebase(item) {
-    admin.database().ref('nonecafelist/' + item.product_id).set({
+    admin.database().ref('drinklist/' + item.product_id).set({
         id: item.product_id,
         name: item.name,
         image: item.thumb,
         price: item.price,
+        product_id: item._id,
         // options: none,
         // promotions: none,
         isrecommended: item.isRecommended,
