@@ -43,6 +43,7 @@ class FirebaseService {
         return new Promise(function(resolve, reject) {
             admin.messaging().send(message)
             .then((response) => {
+                console.log(response);
                 resolve(JSON.stringify(response));
             })
             .catch((error) => {

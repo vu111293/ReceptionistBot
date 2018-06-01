@@ -47,10 +47,10 @@ module.exports = function (app) {
             } else if (source == 'CHATBOT') {
                 if (account.chatbot.token) {
                     let fbMessage = {
-                        // notification: {
-                        //     title: 'Hóa đơn mới',
-                        //     body: 'Mã hóa đơn '
-                        // },
+                        notification: {
+                            title: 'Marika Cafe',
+                            body: message
+                        },
                         data: {
                             text: message
                         },
