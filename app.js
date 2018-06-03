@@ -12,6 +12,7 @@ const mStorage = require('./data-server');
 const util = require('util');
 const request = require('request');
 
+// let localization = require('./localization');
 let uuidv4 = require('uuid/v4');
 let moment = require('moment');
 let express = require('express');
@@ -330,6 +331,7 @@ app.post('/', function (request, response) {
 
     intentMap.set('ask-detail', intent.slackViewDetail);
     intentMap.set('ask-detail-continue-purchase', intent.slackViewDetailContinuePurchase);
+    intentMap.set('quantity-request', intent.slackQuantityRequest);
 
     // intentMap.set('ask-detail - yes', agreeDetailItem);
     // intentMap.set('ask-detail - no', cancelDetailItem);
@@ -363,3 +365,6 @@ app.post('/', function (request, response) {
     // }
     // agent.handleRequest(intentMap);
 });
+
+// localization.setLocale('es');
+// console.log(localization.translate('testing'));

@@ -575,7 +575,7 @@ class DataServer {
             }
             buf.push(price[i]);
         }
-        buf.push("đ");
+        buf.push(" đ");
         return buf.join('');
     }
 

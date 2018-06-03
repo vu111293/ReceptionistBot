@@ -2,6 +2,7 @@ let rxhttp = require('rx-http-request').RxHttpRequest;
 const mAccoutService = require('../services/AccountService');
 const mCafeService = require('../services/CafeService');
 const mStorage = require('../data-server');
+const local = require('../localization');
 
 module.exports = function (app) {
 
@@ -10,6 +11,7 @@ module.exports = function (app) {
         let source = req.body.source;
         let confirm = req.body.confirm; // 'ok/cancel'
         let time = req.body.time; // 'min'
+        let language = req.body.lang;
 
         if (accountId == null) {
             res.status(500).send({ msg: 'accountId param is required' });
@@ -31,11 +33,18 @@ module.exports = function (app) {
             return;
         }
 
+        if (language == null) {
+            language = 'vi';
+        } 
+        local.setLocale(language);
+
+        console.log(local.translate('bill_confirm_ok$[1]', + Number(parseInt(time) / 60).toFixed(0)));
         let account = mAccoutService.findAccountById(accountId);
         if (account) {
+            
             let message = (confirm == 'ok')
-                ? 'Đơn hàng sẽ được giao đến bạn sau *' + Number(parseInt(time) / 60).toFixed(0) + ' phút*.\n Cảm ơn bạn đã sử dụng dịch vụ.'
-                : 'Hiện tại dịch vụ đang bận. Vui lòng thử lại sau';
+                ? local.translate('bill_confirm_ok' + Number(parseInt(time) / 60).toFixed(0))
+                : local.translate('bill_confirm_busy');
 
             if (source == 'SLACK' && account.slack_info.channel) {
                 console.log("Channel " + account.slack_info.channel);
