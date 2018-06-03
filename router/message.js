@@ -35,26 +35,27 @@ module.exports = function (app) {
 
         if (language == null) {
             language = 'vi';
-        } 
+        }
         local.setLocale(language);
-
-        console.log(local.translate('bill_confirm_ok$[1]', + Number(parseInt(time) / 60).toFixed(0)));
         let account = mAccoutService.findAccountById(accountId);
         if (account) {
-            
             let message = (confirm == 'ok')
-                ? local.translate('bill_confirm_ok' + Number(parseInt(time) / 60).toFixed(0))
+                ? local.translate('bill_confirm_ok$[1]', Number(parseInt(time) / 60).toFixed(0))
                 : local.translate('bill_confirm_busy');
 
-            if (source == 'SLACK' && account.slack_info.channel) {
-                console.log("Channel " + account.slack_info.channel);
-                console.log('Sending message to SLACK @@');
-                mCafeService.callAPIPushSlackMessage(
-                    account.slack_info.channel, message)
-                    .then((rs) => res.status(200).send(rs))
-                    .catch((err) => res.status(500).send({body: {error: 'Can\'t push to customer'}}));
+            if (source == 'SLACK') {
+                if (account.slack_info && account.slack_info.channel) {
+                    console.log("Channel " + account.slack_info.channel);
+                    console.log('Sending message to SLACK @@');
+                    mCafeService.callAPIPushSlackMessage(
+                        account.slack_info.channel, message)
+                        .then((rs) => res.status(200).send(rs))
+                        .catch((err) => res.status(500).send({ body: { error: 'Can\'t push to customer' } }));
+                } else {
+                    res.status(500).send({ body: { error: 'Channel was requred before' } });
+                }
             } else if (source == 'CHATBOT') {
-                if (account.chatbot.token) {
+                if (account.chatbot && account.chatbot.token) {
                     let fbMessage = {
                         notification: {
                             title: 'Marika Cafe',
@@ -68,16 +69,16 @@ module.exports = function (app) {
                     console.log(fbMessage);
                     console.log('Sending message to CHATBOT @@');
                     mStorage.pushMessageToDevice(fbMessage)
-                        .then((rs) => res.status(200).send({body: {}}))
-                        .catch((err) => res.status(500).send({body: {error: 'Can\'t push to customer'}}));
+                        .then((rs) => res.status(200).send({ body: {} }))
+                        .catch((err) => res.status(500).send({ body: { error: 'Can\'t push to customer' } }));
                 } else {
-                    res.status(500).send({body: {error: 'Token was requred before'}});
+                    res.status(500).send({ body: { error: 'Token was requred before' } });
                 }
             } else {
-                res.status(500).send({body: {error:'Platform not support'}});
+                res.status(500).send({ body: { error: 'Platform not support' } });
             }
         } else {
-            res.status(500).send({body: {error: 'Account not found'}});
+            res.status(500).send({ body: { error: 'Account not found' } });
         }
     });
 

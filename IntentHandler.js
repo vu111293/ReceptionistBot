@@ -684,7 +684,7 @@ function buildCategories() {
 function buildShipEditSuggestion(agent) {
     addContextShipEdit(agent);
     response(agent, local.translate('ship_edit'), null,
-        [local.translate('username_edit'), local.translate('ship_address_edit'), local.translate('phone_edit')]);
+        [local.translate('username_edit'), local.translate('ship_address_edit'), local.translate('phone_edit'), local.translate('payment')]);
 }
 
 function addContextShipEdit(agent) {
