@@ -710,7 +710,7 @@ function buildShipInfo(agent, ship = true) {
     let account = getAccount(agent);
     let infoItems = [];
     response(agent, local.translate('user_info'), getShipInfo(agent, ship),
-        [local.translate('username_edit'), local.translate('ship_address_edit'), local.translate('phone_edit')]);
+        [local.translate('username_edit'), local.translate('ship_address_edit'), local.translate('phone_edit'), local.translate('payment')]);
 }
 
 function saveFeedback(feedback) {
