@@ -1170,6 +1170,7 @@ function response(agent, title, content, options, speech, cmd) {
             options: options,
             speech: speech,
             commands: cmd,
+            language: language
         };
 
         if (content) {
